@@ -1,0 +1,120 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Gateway: Serve (No Auth)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "server.main:app",
+                "--host", "0.0.0.0",
+                "--port", "8000",
+                "--reload"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "env": {
+                "AUTH_ENABLED": "false",
+                "DATABASE_URL": "sqlite:///secure_mcp_gateway.db",
+                "AUDIT_TO_STDOUT": "true",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Gateway: Serve (With Auth)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "server.main:app",
+                "--host", "0.0.0.0",
+                "--port", "8000",
+                "--reload"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "env": {
+                "AUTH_ENABLED": "true",
+                "KEYCLOAK_URL": "http://localhost:8080",
+                "KEYCLOAK_REALM": "mcp-gateway",
+                "DATABASE_URL": "sqlite:///secure_mcp_gateway.db",
+                "AUDIT_TO_STDOUT": "true",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Mock MCP Server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/mock_mcp_server/server.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "CLI: List Servers",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli/datacline.py",
+            "args": [
+                "list-servers"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "CLI: List Tools (Default)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli/datacline.py",
+            "args": [
+                "list-tools",
+                "default"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "CLI: Invoke Tool",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli/datacline.py",
+            "args": [
+                "invoke",
+                "default",
+                "echo",
+                "--params",
+                "{\"message\": \"Hello from VS Code\"}"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Gateway + Mock Server",
+            "configurations": [
+                "Mock MCP Server",
+                "Gateway: Serve (No Auth)"
+            ],
+            "stopAll": true,
+            "preLaunchTask": null
+        }
+    ]
+}

@@ -1,0 +1,35 @@
+# MCP Servers Configuration
+# Define MCP servers that the gateway can proxy to
+
+servers:
+  # Default/Example MCP server (for local development)
+  default:
+    url: http://localhost:3000
+    type: http
+    timeout: 30
+    enabled: true
+    description: "Local mock MCP server for testing"
+
+  # Mock server (only works in Docker)
+  mock-server:
+    url: http://localhost:3000
+    type: http
+    timeout: 30
+    enabled: true
+    description: "Mock MCP server in Docker (only works with docker-compose)"
+
+  # Example: Production MCP server
+  # prod-server:
+  #   url: https://mcp.example.com
+  #   type: http
+  #   timeout: 60
+  #   enabled: true
+  #   description: "Production MCP server"
+
+  # Example: Development MCP server
+  # dev-server:
+  #   url: http://dev-mcp.internal:3000
+  #   type: http
+  #   timeout: 30
+  #   enabled: true
+  #   description: "Development MCP server"

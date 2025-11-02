@@ -1,0 +1,83 @@
+# Docker Compose for Local Development
+# Run only the services you need for local testing
+# Usage: docker-compose -f docker-compose.local.yml up
+
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mcp-gateway-db-local
+    environment:
+      POSTGRES_USER: mcp_user
+      POSTGRES_PASSWORD: mcp_password
+      POSTGRES_MULTIPLE_DATABASES: mcp_gateway,keycloak
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak for authentication (accessible on host)
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: mcp-gateway-keycloak-local
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: mcp_user
+      KC_DB_PASSWORD: mcp_password
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_HOST: 127.0.0.1
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    command:
+      - start-dev
+      - --http-enabled=true
+      - --hostname-strict=false
+      - --hostname-strict-https=false
+      - --proxy=edge
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Mock MCP Server (for testing)
+  mock-mcp-server:
+    image: python:3.11-slim
+    container_name: mock-mcp-server-local
+    working_dir: /app
+    command: >
+      sh -c "pip install fastapi uvicorn &&
+             echo 'from fastapi import FastAPI;
+             app = FastAPI();
+             @app.get(\"/tools\")
+             async def list_tools():
+                 return {\"tools\": [{\"name\": \"test_tool\", \"description\": \"Test tool\"}]};
+             @app.post(\"/tools/{tool_name}/invoke\")
+             async def invoke_tool(tool_name: str):
+                 return {\"result\": \"success\", \"tool_name\": tool_name};
+             @app.get(\"/info\")
+             async def info():
+                 return {\"name\": \"Mock MCP Server\", \"version\": \"1.0.0\"}' > main.py &&
+             uvicorn main:app --host 0.0.0.0 --port 3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_local_data:

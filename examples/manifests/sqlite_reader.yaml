@@ -1,0 +1,23 @@
+name: sqlite_reader
+version: "1.0.0"
+description: "Read and query SQLite databases securely"
+path: "./examples/tools/sqlite_reader/reader.py"
+permissions:
+  - read
+  - execute
+parameters:
+  database:
+    type: string
+    description: "Path to SQLite database file"
+    required: true
+  query:
+    type: string
+    description: "SQL query to execute"
+    required: true
+  limit:
+    type: integer
+    description: "Maximum number of rows to return"
+    default: 100
+environment:
+  SQLITE_SAFE_MODE: "true"
+timeout: 30

@@ -1,0 +1,14 @@
+p, admin, *, *
+p, developer, mcp:dev-server:*, list_tools
+p, developer, mcp:dev-server:*, invoke_tool
+p, developer, mcp:staging-server:*, list_tools
+p, analyst, mcp:*:sqlite_reader, invoke_tool
+p, analyst, mcp:*:file_loader, invoke_tool
+p, user, mcp:*:*, list_tools
+g, admin@example.com, admin
+g, dev@example.com, developer
+g, analyst@example.com, analyst
+g, anonymous, user
+g, /admins, admin
+g, /developers, developer
+g, /analysts, analyst

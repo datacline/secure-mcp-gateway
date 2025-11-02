@@ -1,0 +1,23 @@
+name: file_loader
+version: "1.0.0"
+description: "Load and process files with various formats"
+path: "./examples/tools/file_loader/loader.py"
+permissions:
+  - read
+  - execute
+parameters:
+  file_path:
+    type: string
+    description: "Path to file to load"
+    required: true
+  format:
+    type: string
+    description: "File format (json, yaml, csv, txt)"
+    default: "txt"
+  encoding:
+    type: string
+    description: "File encoding"
+    default: "utf-8"
+environment:
+  MAX_FILE_SIZE: "10485760"  # 10MB
+timeout: 20
