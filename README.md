@@ -21,12 +21,12 @@ The gateway is a **pure proxy** - MCP servers are pre-built and registered with 
 
 ## Features
 
-- 🔐 **JWT Authentication** - Keycloak integration with JWKS validation and token caching
-- 🛡️ **RBAC Policy Engine** - Flexible, YAML-based policies using Casbin
-- 🔄 **MCP Server Proxy** - Forward requests to configured MCP servers
-- 📝 **Structured Audit Logging** - JSON-formatted logs to file and/or stdout
-- 🐳 **Container Ready** - Docker and docker-compose support
-- 🛠️ **CLI Tool** - Easy management with `datacline` command
+- **JWT Authentication** - Keycloak integration with JWKS validation and token caching
+- **RBAC Policy Engine** - Flexible, YAML-based policies using Casbin
+- **MCP Server Proxy** - Forward requests to configured MCP servers
+- **Structured Audit Logging** - JSON-formatted logs to file and/or stdout
+- **Container Ready** - Docker and docker-compose support
+- **CLI Tool** - Easy management with `datacline` command and Makefile
 
 ## Project Structure
 
@@ -61,50 +61,80 @@ secure-mcp-gateway/
 └── README.md
 ```
 
-## Installation
-
-### Option 1: Docker (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/secure-mcp-gateway.git
-cd secure-mcp-gateway
-
-# Start the entire stack (Gateway + Keycloak + PostgreSQL + Mock MCP Server)
-docker-compose up
-```
-
-The gateway will be available at `http://localhost:8000`
-Keycloak admin console at `http://localhost:8080` (admin/admin)
-
-### Option 2: Local Development
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/secure-mcp-gateway.git
-cd secure-mcp-gateway
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your configuration
-# Start the server
-python cli/datacline.py serve
-```
-
 ## Quick Start
 
-### 1. Start the Gateway
+### First Time Setup
 
 ```bash
-# Using CLI
-python cli/datacline.py serve
+# Clone the repository
+git clone https://github.com/datacline/secure-mcp-gateway.git
+cd secure-mcp-gateway
 
-# Or with options
-python cli/datacline.py serve --host 0.0.0.0 --port 8000 --no-auth
+# Copy environment file
+cp .env.example .env
+
+# One command to set everything up (takes ~2 minutes first time)
+make
+```
+
+This automatically:
+1. Builds Docker images
+2. Starts all services (Gateway, Keycloak, PostgreSQL, Mock MCP Server)
+3. Configures Keycloak with realm, client, and test users
+4. Verifies everything is working
+
+Services will be available at:
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| MCP Gateway | http://localhost:8000 | Requires JWT token |
+| Keycloak Admin | http://localhost:8080 | admin / admin |
+| PostgreSQL | localhost:5432 | mcp_user / mcp_password |
+| Mock MCP Server | http://localhost:3000 | No auth |
+
+**Test Users** (created automatically by `make`):
+
+| Username | Password | Purpose |
+|----------|----------|---------|
+| testuser | testpass | Regular user for testing |
+| admin | admin123 | Admin user |
+
+### Common Commands
+
+**Development:**
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Restart a service
+docker-compose restart mcp-gateway
+```
+
+**Testing:**
+```bash
+# Test authentication with Keycloak
+make test-auth
+```
+
+**Cleanup:**
+```bash
+# Clean restart (removes all data)
+make clean && make
+
+# Re-configure Keycloak
+make keycloak-setup
+```
+
+**Help:**
+```bash
+# Show all available commands
+make help
 ```
 
 ### 2. Register a Pre-built MCP Server
@@ -463,17 +493,33 @@ pytest tests/
 
 ## Troubleshooting
 
+### Services Won't Start
+
+```bash
+# Check service status
+docker-compose ps
+
+# Check logs for errors
+docker-compose logs -f
+
+# Clean restart (removes all data)
+make clean && make init
+```
+
 ### Authentication Issues
 
 ```bash
 # Check if auth is enabled
 curl http://localhost:8000/config
 
-# Test without auth
-datacline serve --no-auth
+# Re-run Keycloak setup
+make keycloak-setup
 
-# Verify Keycloak is running
-curl http://localhost:8080/health
+# Verify Keycloak is healthy
+curl http://localhost:8080
+
+# Test authentication
+make test-auth
 ```
 
 ### Policy Denials
@@ -484,6 +530,7 @@ tail -f audit.json | jq 'select(.event_type == "policy_violation")'
 
 # Verify user roles
 # Edit policies/policy.yaml and restart gateway
+docker-compose restart mcp-gateway
 ```
 
 ### MCP Server Connection Issues
@@ -497,6 +544,16 @@ cat mcp_servers.yaml
 
 # View gateway logs
 docker-compose logs mcp-gateway
+```
+
+### Port Conflicts
+
+If ports 8000, 8080, or 5432 are already in use, edit `docker-compose.yml`:
+
+```yaml
+ports:
+  - "8001:8000"  # Change 8000 to 8001 for gateway
+  - "8081:8080"  # Change 8080 to 8081 for Keycloak
 ```
 
 ## Contributing
@@ -517,7 +574,7 @@ See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/yourusername/secure-mcp-gateway/issues)
+- Issues: [GitHub Issues](https://github.com/datacline/secure-mcp-gateway/issues)
 - Documentation: This README
 - Examples: See `examples/` directory
 
