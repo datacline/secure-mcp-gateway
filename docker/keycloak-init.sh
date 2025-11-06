@@ -59,11 +59,18 @@ else
         "enabled": true,
         "displayName": "MCP Gateway",
         "accessTokenLifespan": 3600,
-        "ssoSessionMaxLifespan": 36000
+        "ssoSessionMaxLifespan": 36000,
+        "sslRequired": "none"
       }' || true
 
     echo "Realm 'mcp-gateway' created"
 fi
+
+# Update SSL requirement (in case realm already existed)
+curl -s -X PUT "http://keycloak:8080/admin/realms/mcp-gateway" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sslRequired": "none"}' || true
 
 # Check if client already exists
 CLIENT_ID=$(curl -s -X GET "http://keycloak:8080/admin/realms/mcp-gateway/clients?clientId=mcp-gateway-client" \
