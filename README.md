@@ -110,7 +110,7 @@ python cli/datacline.py serve --host 0.0.0.0 --port 8000 --no-auth
 ### 2. Register a Pre-built MCP Server
 
 ```bash
-# Register an MCP server
+# Register an MCP server without authentication
 python cli/datacline.py register-mcp prod-server https://mcp.example.com
 
 # Register with options
@@ -118,6 +118,23 @@ python cli/datacline.py register-mcp dev-server http://localhost:3000 \
   --type http \
   --timeout 30 \
   --enabled
+
+# Register with API key authentication
+python cli/datacline.py register-mcp salesforce-prod https://mcp.salesforce.example.com \
+  --auth-method api_key \
+  --auth-location header \
+  --auth-name X-API-Key \
+  --auth-format raw \
+  --credential-ref env://SALESFORCE_API_KEY
+
+# Register with Bearer token authentication
+python cli/datacline.py register-mcp internal-api https://api.internal.example.com \
+  --auth-method bearer \
+  --auth-location header \
+  --auth-name Authorization \
+  --auth-format prefix \
+  --auth-prefix "Bearer " \
+  --credential-ref env://INTERNAL_API_TOKEN
 ```
 
 This updates `mcp_servers.yaml`:
@@ -129,6 +146,19 @@ servers:
     type: http
     timeout: 60
     enabled: true
+    auth: null
+
+  salesforce-prod:
+    url: https://mcp.salesforce.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: env://SALESFORCE_API_KEY
 ```
 
 ### 3. List Available MCP Servers
@@ -156,6 +186,261 @@ python cli/datacline.py invoke prod-server my_tool \
   --params-file params.json \
   --token <your-jwt-token>
 ```
+
+### 6. Broadcast Invocation (Query Multiple Servers)
+
+The broadcast pattern allows you to query multiple MCP servers simultaneously and aggregate results. This implements the **"broadcast and let LLM filter"** pattern where:
+- The gateway calls the same tool on multiple servers concurrently
+- ALL results are returned to the caller (typically an LLM like Claude)
+- The LLM filters and processes results based on the user's query context
+
+**Use cases:**
+- Query logs from multiple ELK clusters (campaign-cluster, event-cluster)
+- Search data across distributed systems
+- Aggregate information from multiple sources
+
+```bash
+# Query all servers with "elk-logs" tag
+python cli/datacline.py invoke-broadcast get_logs \
+  --tags elk-logs \
+  --params '{"query":"error"}' \
+  --token <jwt>
+
+# Query specific servers by name
+python cli/datacline.py invoke-broadcast get_logs \
+  --servers campaign-node1,event-node1,event-node2 \
+  --params '{"query":"campaign failure"}' \
+  --token <jwt>
+
+# Query all enabled servers (default behavior)
+python cli/datacline.py invoke-broadcast get_logs \
+  --params '{"query":"service errors"}' \
+  --token <jwt>
+
+# Full output format (complete results)
+python cli/datacline.py invoke-broadcast get_logs \
+  --tags elk-logs \
+  --format full
+
+# JSON output for programmatic use
+python cli/datacline.py invoke-broadcast get_logs \
+  --tags elk-logs \
+  --format json
+```
+
+**Example scenario from your diagram:**
+
+```yaml
+# mcp_servers.yaml configuration
+servers:
+  campaign-cluster-node1:
+    url: https://elk-campaign-1.example.com
+    tags: ["elk-logs", "campaign"]
+    tools: ["get_logs"]
+
+  campaign-cluster-node2:
+    url: https://elk-campaign-2.example.com
+    tags: ["elk-logs", "campaign"]
+    tools: ["get_logs"]
+
+  event-cluster-node1:
+    url: https://elk-event-1.example.com
+    tags: ["elk-logs", "events"]
+    tools: ["get_logs"]
+```
+
+```bash
+# AI Chat asks: "Are there any event service errors that led to campaign failure?"
+# Gateway broadcasts to all elk-logs servers
+python cli/datacline.py invoke-broadcast get_logs \
+  --tags elk-logs \
+  --params '{"query":"campaign failure OR event service error", "timeframe":"24h"}'
+
+# Results returned:
+# - campaign-cluster-node1: [campaign logs...]
+# - campaign-cluster-node2: [campaign logs...]
+# - event-cluster-node1: [event logs...]
+#
+# LLM receives ALL results and filters based on query context
+```
+
+## Standard MCP Integration
+
+The gateway implements the **standard Model Context Protocol (MCP)**, making it compatible with AI agents like **Claude Desktop** and **Cursor**. These agents can connect to the gateway as a single MCP server and automatically discover all tools from your backend servers.
+
+### How It Works
+
+1. **Gateway as MCP Server**: The gateway exposes standard MCP endpoints (`GET /tools`, `POST /tools/{name}/invoke`)
+2. **Tool Aggregation**: Tools from all backend servers are aggregated by name
+3. **Automatic Broadcast**: When a tool exists on multiple servers, the gateway automatically queries all of them
+4. **Generic Results**: Raw results are returned tagged by server name - the AI agent handles semantic filtering
+
+### Architecture
+
+```
+Claude Desktop / Cursor
+    ↓
+  Connects to: http://localhost:8000 (Gateway as MCP server)
+    ↓
+  Discovers tools: ["search_logs", "query_metrics", ...]
+    ↓
+  Invokes: search_logs
+    ↓
+Gateway automatically broadcasts to ALL servers with "search_logs":
+    ├─→ elasticsearch-campaign-us
+    ├─→ elasticsearch-campaign-eu
+    └─→ elasticsearch-events
+    ↓
+Returns aggregated results to AI agent
+    ↓
+Claude/Cursor filters and correlates based on user query
+```
+
+### Configure Claude Desktop
+
+Create or update `~/.config/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "enterprise-gateway": {
+      "url": "http://localhost:8000",
+      "transport": "http"
+    }
+  }
+}
+```
+
+Then restart Claude Desktop. The gateway's tools will appear in Claude's tool list.
+
+### Configure Cursor
+
+Add to your Cursor MCP settings:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "enterprise-gateway": {
+        "url": "http://localhost:8000",
+        "description": "Enterprise MCP Gateway",
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+### Example: Real-World Usage
+
+**Your Configuration** ([mcp_servers.yaml](mcp_servers.yaml)):
+```yaml
+servers:
+  elasticsearch-campaign-us:
+    url: https://elk-campaign-us.example.com
+    type: elasticsearch-mcp
+    tools: ["search_logs", "get_indices", "query_data"]
+    metadata:
+      description: "Campaign marketing data - US region"
+      data_sources: ["marketing_campaigns", "ad_performance"]
+
+  elasticsearch-events:
+    url: https://elk-events.example.com
+    type: elasticsearch-mcp
+    tools: ["search_logs", "get_indices", "query_data"]
+    metadata:
+      description: "User event tracking and service logs"
+      data_sources: ["user_events", "service_logs"]
+```
+
+**Claude Desktop discovers**:
+- `search_logs` - Available across 2 servers
+- `get_indices` - Available across 2 servers
+- `query_data` - Available across 2 servers
+
+**User asks Claude**:
+> "Are there any event service errors that led to campaign failure in the last hour?"
+
+**Claude automatically**:
+1. Calls `search_logs` with query parameters
+2. Gateway broadcasts to both Elasticsearch clusters
+3. Claude receives results from both clusters
+4. Claude analyzes temporal correlation: event error at 10:29:50 → campaign failure at 10:30:00
+5. Claude responds with intelligent analysis
+
+**No manual server selection required!** The gateway and Claude handle everything.
+
+### Standard MCP Endpoints
+
+The gateway implements these standard MCP protocol endpoints:
+
+#### `GET /tools`
+Lists all tools aggregated from backend servers.
+
+**Response**:
+```json
+{
+  "tools": [
+    {
+      "name": "search_logs",
+      "description": "Execute 'search_logs' tool across multiple backend servers...",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      }
+    }
+  ]
+}
+```
+
+#### `POST /tools/{tool_name}/invoke`
+Invokes a tool with automatic broadcast to all servers that provide it.
+
+**Request**:
+```json
+{
+  "query": "error AND campaign",
+  "timeframe": "1h"
+}
+```
+
+**Response**:
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully executed 'search_logs' on 2/2 servers"
+    },
+    {
+      "type": "resource",
+      "resource": {
+        "uri": "gateway://results/search_logs",
+        "mimeType": "application/json",
+        "text": "{\"results\": {...}, \"metadata\": {...}}"
+      }
+    }
+  ],
+  "isError": false
+}
+```
+
+### Benefits
+
+✅ **Zero configuration in AI agent** - Just add gateway URL
+✅ **Automatic tool discovery** - AI sees all available tools
+✅ **Transparent broadcast** - No need to specify which servers to query
+✅ **Smart filtering** - AI handles semantic aggregation
+✅ **Standard protocol** - Works with any MCP-compatible client
+✅ **Vendor agnostic** - Add any MCP server without code changes
+
+### Example Configurations
+
+See the [examples/](examples/) directory for complete configurations:
+- [claude_desktop_config.json](examples/claude_desktop_config.json) - Claude Desktop setup
+- [cursor_mcp_config.json](examples/cursor_mcp_config.json) - Cursor setup
+- [mcp_servers_complete.yaml](examples/mcp_servers_complete.yaml) - Multi-vendor server configuration
 
 ## API Endpoints
 
@@ -212,6 +497,52 @@ Content-Type: application/json
 }
 ```
 
+#### Invoke Tool (Broadcast)
+```http
+POST /mcp/invoke-broadcast
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "tool_name": "get_logs",
+  "parameters": {
+    "query": "campaign failure",
+    "timeframe": "24h"
+  },
+  "tags": ["elk-logs"],           // Optional: filter by tags
+  "mcp_servers": ["server1", "server2"]  // Optional: specific servers
+}
+```
+
+**Response:**
+```json
+{
+  "tool_name": "get_logs",
+  "total_servers": 3,
+  "successful": 3,
+  "failed": 0,
+  "execution_time_ms": 1250,
+  "results": {
+    "campaign-cluster-node1": {
+      "logs": [
+        {"timestamp": "2024-01-15T10:30:00Z", "message": "Campaign failed", "level": "error"}
+      ]
+    },
+    "campaign-cluster-node2": {
+      "logs": [
+        {"timestamp": "2024-01-15T10:29:55Z", "message": "Campaign processing started", "level": "info"}
+      ]
+    },
+    "event-cluster-node1": {
+      "logs": [
+        {"timestamp": "2024-01-15T10:29:50Z", "message": "Event service timeout", "level": "error"}
+      ]
+    }
+  },
+  "errors": {}
+}
+```
+
 #### List Servers
 ```http
 GET /mcp/servers
@@ -260,19 +591,98 @@ Edit `mcp_servers.yaml` to configure MCP servers:
 
 ```yaml
 servers:
+  # Server without authentication
   prod-server:
     url: https://mcp.production.example.com
     type: http
     timeout: 60
     enabled: true
     description: "Production MCP server"
+    auth: null
 
-  dev-server:
-    url: http://dev-mcp.internal:3000
+  # API Key authentication (raw format)
+  salesforce-prod:
+    url: https://mcp.salesforce.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    description: "Salesforce MCP server"
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: env://SALESFORCE_API_KEY
+
+  # Bearer token authentication
+  internal-api:
+    url: https://api.internal.example.com
     type: http
     timeout: 30
     enabled: true
-    description: "Development MCP server"
+    description: "Internal API MCP server"
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://INTERNAL_API_TOKEN
+
+  # Custom authentication with template
+  custom-api:
+    url: https://custom.example.com
+    type: http
+    timeout: 30
+    enabled: true
+    description: "Custom API with special auth format"
+    auth:
+      method: custom
+      location: header
+      name: X-Custom-Auth
+      format: template
+      template: "CustomToken {credential}"
+      credential_ref: env://CUSTOM_API_TOKEN
+
+  # File-based credential
+  file-auth:
+    url: https://file-based.example.com
+    type: http
+    timeout: 30
+    enabled: true
+    description: "MCP server with file-based auth"
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: file:///etc/secrets/api_key.txt
+```
+
+#### Authentication Configuration Options
+
+**Credential References:**
+- `env://VAR_NAME` - Read from environment variable
+- `file:///path/to/file` - Read from file (first line, trimmed)
+- `vault://path/to/secret` - Read from HashiCorp Vault (future feature)
+
+**Authentication Methods:**
+- `api_key` - API key authentication
+- `bearer` - Bearer token authentication
+- `basic` - Basic authentication (Base64 encoded)
+- `oauth2` - OAuth2 token authentication
+- `custom` - Custom authentication format
+- `none` - No authentication
+
+**Locations:**
+- `header` - Add to request headers (most common)
+- `query` - Add to query parameters
+- `body` - Add to request body (JSON)
+
+**Formats:**
+- `raw` - Use credential as-is
+- `prefix` - Add a prefix (e.g., "Bearer ", "ApiKey ")
+- `template` - Use a template string with `{credential}` placeholder
 ```
 
 ### Policy Configuration
@@ -333,13 +743,38 @@ datacline serve --port 8080 --no-auth    # Start with custom settings
 
 # MCP Server Registration
 datacline register-mcp <name> <url>                    # Register MCP server
-datacline register-mcp prod https://mcp.example.com    # Example
+datacline register-mcp prod https://mcp.example.com    # Example (no auth)
 datacline list-servers --token <jwt>                   # List registered servers
+
+# Register MCP server with authentication
+datacline register-mcp salesforce-prod https://mcp.salesforce.example.com \
+  --auth-method api_key \
+  --auth-location header \
+  --auth-name X-API-Key \
+  --auth-format raw \
+  --credential-ref env://SALESFORCE_API_KEY
+
+# Register with Bearer token
+datacline register-mcp internal-api https://api.internal.example.com \
+  --auth-method bearer \
+  --credential-ref env://INTERNAL_API_TOKEN
+
+# Register with custom template format
+datacline register-mcp custom-api https://custom.example.com \
+  --auth-method custom \
+  --auth-format template \
+  --auth-template "CustomToken {credential}" \
+  --credential-ref env://CUSTOM_TOKEN
 
 # MCP Operations (requires auth token)
 datacline list-tools <server> --token <jwt>                      # List tools
 datacline invoke <server> <tool> --params '{}' --token <jwt>    # Invoke tool
 datacline invoke <server> <tool> --params-file params.json      # With file
+
+# Broadcast invocation (query multiple servers)
+datacline invoke-broadcast <tool> --tags <tags> --params '{}'   # By tags
+datacline invoke-broadcast <tool> --servers <s1,s2> --params '{}' # By server names
+datacline invoke-broadcast <tool> --format json                  # JSON output
 ```
 
 ## Authentication

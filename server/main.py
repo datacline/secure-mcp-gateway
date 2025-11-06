@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from server.routes import mcp
+from server.routes import mcp, mcp_standard
 from server.config import settings
 
 # Configure logging
@@ -26,26 +26,31 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(mcp.router)  # MCP proxy endpoints
+# Standard MCP protocol endpoints (for Claude Desktop, Cursor, etc.)
+app.include_router(mcp_standard.router)
+
+# Legacy REST API endpoints (for direct HTTP API access)
+app.include_router(mcp.router)
 
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
+@app.get("/api")
+async def api_info():
+    """API information (legacy REST API)"""
     return {
-        "name": "Secure MCP Gateway",
+        "name": "Secure MCP Gateway - REST API",
         "version": "2.0.0",
-        "description": "Gateway for secure MCP server access with authentication and policy enforcement",
+        "description": "REST API endpoints for MCP server management",
         "features": [
             "JWT/Keycloak authentication",
             "RBAC policy engine",
             "MCP server proxying",
             "Structured audit logging",
-            "Tool management"
+            "Broadcast invocation"
         ],
         "endpoints": {
             "list_tools": "GET /mcp/list-tools?mcp_server={name}",
             "invoke": "POST /mcp/invoke?mcp_server={name}",
+            "invoke_broadcast": "POST /mcp/invoke-broadcast",
             "servers": "GET /mcp/servers",
             "server_info": "GET /mcp/server/{name}/info"
         },

@@ -1,0 +1,238 @@
+# Complete MCP Servers Configuration Example
+# This file shows a real-world setup with multiple vendors and clusters
+
+servers:
+  # ============================================================================
+  # ELASTICSEARCH MCP SERVERS (Distributed across regions/clusters)
+  # ============================================================================
+
+  elasticsearch-campaign-us-east:
+    url: https://elk-campaign-us-east.example.com
+    type: elasticsearch-mcp
+    version: 1.2.0
+    timeout: 60
+    enabled: true
+    description: "Elasticsearch - Campaign marketing data (US East)"
+    tags: ["elasticsearch", "logs", "campaign", "us"]
+    tools:
+      - search_logs
+      - get_indices
+      - query_data
+      - aggregate_data
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: env://ELASTICSEARCH_API_KEY
+    metadata:
+      cluster: "campaign-us-east"
+      region: "us-east-1"
+      description: "Campaign marketing data - US East region"
+      data_sources:
+        - marketing_campaigns
+        - ad_performance
+        - conversion_tracking
+        - email_campaigns
+      retention: "90 days"
+      indices: "campaigns-*, marketing-*"
+
+  elasticsearch-campaign-eu-west:
+    url: https://elk-campaign-eu-west.example.com
+    type: elasticsearch-mcp
+    version: 1.2.0
+    timeout: 60
+    enabled: true
+    description: "Elasticsearch - Campaign marketing data (EU West)"
+    tags: ["elasticsearch", "logs", "campaign", "eu"]
+    tools:
+      - search_logs
+      - get_indices
+      - query_data
+      - aggregate_data
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: env://ELASTICSEARCH_API_KEY
+    metadata:
+      cluster: "campaign-eu-west"
+      region: "eu-west-1"
+      description: "Campaign marketing data - EU West region (GDPR compliant)"
+      data_sources:
+        - marketing_campaigns
+        - ad_performance
+        - gdpr_compliant_data
+      retention: "90 days"
+      compliance: "GDPR"
+      indices: "campaigns-*, marketing-*"
+
+  elasticsearch-events-us:
+    url: https://elk-events-us.example.com
+    type: elasticsearch-mcp
+    version: 1.2.0
+    timeout: 60
+    enabled: true
+    description: "Elasticsearch - User events and service logs"
+    tags: ["elasticsearch", "logs", "events", "us"]
+    tools:
+      - search_logs
+      - get_indices
+      - query_data
+      - aggregate_data
+    auth:
+      method: api_key
+      location: header
+      name: X-API-Key
+      format: raw
+      credential_ref: env://ELASTICSEARCH_API_KEY
+    metadata:
+      cluster: "events-us"
+      region: "us-east-1"
+      description: "User event tracking and service logs"
+      data_sources:
+        - user_events
+        - page_views
+        - user_interactions
+        - service_logs
+        - error_logs
+      retention: "30 days"
+      indices: "events-*, logs-*"
+
+  # ============================================================================
+  # DATADOG MCP SERVER (Infrastructure Monitoring)
+  # ============================================================================
+
+  datadog-monitoring:
+    url: https://datadog-mcp.example.com
+    type: datadog-mcp
+    version: 2.1.0
+    timeout: 60
+    enabled: true
+    description: "Datadog infrastructure monitoring and APM"
+    tags: ["monitoring", "metrics", "apm"]
+    tools:
+      - query_metrics
+      - get_alerts
+      - search_logs
+      - get_traces
+      - get_dashboards
+    auth:
+      method: api_key
+      location: header
+      name: DD-API-KEY
+      format: raw
+      credential_ref: env://DATADOG_API_KEY
+    metadata:
+      description: "Infrastructure monitoring, APM, and alerting"
+      data_sources:
+        - infrastructure_metrics
+        - application_traces
+        - log_aggregation
+        - alerts
+        - synthetic_monitoring
+      retention: "15 months"
+
+  # ============================================================================
+  # GITHUB MCP SERVER (Code and Issue Management)
+  # ============================================================================
+
+  github-enterprise:
+    url: https://github-mcp.example.com
+    type: github-mcp
+    version: 1.0.0
+    timeout: 30
+    enabled: true
+    description: "GitHub Enterprise - Code repository and project management"
+    tags: ["github", "code", "issues"]
+    tools:
+      - search_code
+      - get_issues
+      - get_pull_requests
+      - search_repositories
+      - get_commits
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://GITHUB_TOKEN
+    metadata:
+      description: "GitHub Enterprise for code search and project management"
+      data_sources:
+        - source_code
+        - issues
+        - pull_requests
+        - commits
+        - discussions
+      organization: "my-company"
+
+  # ============================================================================
+  # SALESFORCE MCP SERVER (CRM Data)
+  # ============================================================================
+
+  salesforce-production:
+    url: https://mcp.salesforce.example.com
+    type: salesforce-mcp
+    version: 3.0.0
+    timeout: 60
+    enabled: true
+    description: "Salesforce Production - CRM and customer data"
+    tags: ["salesforce", "crm", "customers"]
+    tools:
+      - query_accounts
+      - query_contacts
+      - query_opportunities
+      - query_cases
+      - search_records
+    auth:
+      method: oauth2
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://SALESFORCE_ACCESS_TOKEN
+    metadata:
+      description: "Salesforce CRM - Production environment"
+      data_sources:
+        - accounts
+        - contacts
+        - opportunities
+        - cases
+        - campaigns
+      environment: "production"
+      instance: "na1"
+
+  # ============================================================================
+  # CUSTOM MCP SERVER (Internal Tools)
+  # ============================================================================
+
+  custom-analytics-platform:
+    url: https://analytics-mcp.internal.example.com
+    type: custom-mcp
+    version: 1.0.0
+    timeout: 45
+    enabled: true
+    description: "Custom analytics platform - Internal BI and reporting"
+    tags: ["custom", "analytics", "bi"]
+    tools:
+      - query_analytics
+      - get_reports
+      - run_dashboard
+    auth:
+      method: custom
+      location: header
+      name: X-Internal-Auth
+      format: template
+      template: "Internal {credential}"
+      credential_ref: env://INTERNAL_ANALYTICS_KEY
+    metadata:
+      description: "Custom internal analytics and business intelligence platform"
+      data_sources:
+        - business_metrics
+        - revenue_analytics
+        - user_analytics
+        - product_analytics
+      department: "Data Engineering"
