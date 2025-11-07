@@ -134,6 +134,7 @@ gateway_data/
 !.vscode/launch.json
 !.vscode/settings.json
 .idea/
+.claude/
 *.swp
 *.swo
 *~
