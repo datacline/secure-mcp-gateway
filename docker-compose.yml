@@ -53,10 +53,11 @@ services:
     networks:
       - mcp-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # MCP Gateway
   mcp-gateway:
@@ -69,7 +70,7 @@ services:
       DATABASE_URL: postgresql://mcp_user:mcp_password@postgres:5432/mcp_gateway
 
       # Auth settings
-      AUTH_ENABLED: "true"
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: mcp-gateway
       JWKS_URL: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
@@ -113,19 +114,10 @@ services:
     image: python:3.11-slim
     container_name: mock-mcp-server
     working_dir: /app
+    volumes:
+      - ./docker/mock_mcp_server.py:/app/main.py
     command: >
-      sh -c "pip install fastapi uvicorn &&
-             echo 'from fastapi import FastAPI;
-             app = FastAPI();
-             @app.get(\"/tools\")
-             async def list_tools():
-                 return {\"tools\": [{\"name\": \"test_tool\", \"description\": \"Test tool\"}]};
-             @app.post(\"/tools/{tool_name}/invoke\")
-             async def invoke_tool(tool_name: str):
-                 return {\"result\": \"success\", \"tool_name\": tool_name};
-             @app.get(\"/info\")
-             async def info():
-                 return {\"name\": \"Mock MCP Server\", \"version\": \"1.0.0\"}' > main.py &&
+      sh -c "pip install --no-cache-dir fastapi uvicorn &&
              uvicorn main:app --host 0.0.0.0 --port 3000"
     ports:
       - "3000:3000"
