@@ -48,6 +48,25 @@ class InvokeToolResponse(BaseModel):
     execution_time_ms: Optional[int] = None
 
 
+class InvokeBroadcastRequest(BaseModel):
+    """Request model for broadcast tool invocation"""
+    tool_name: str
+    parameters: Optional[Dict[str, Any]] = None
+    mcp_servers: Optional[List[str]] = None  # Specific servers to query
+    tags: Optional[List[str]] = None  # Query servers by tags
+
+
+class InvokeBroadcastResponse(BaseModel):
+    """Response model for broadcast tool invocation"""
+    tool_name: str
+    total_servers: int
+    successful: int
+    failed: int
+    results: Dict[str, Any]  # server_name -> result
+    errors: Dict[str, str]  # server_name -> error message
+    execution_time_ms: int
+
+
 class ListToolsResponse(BaseModel):
     """Response model for listing tools"""
     mcp_server: str
@@ -241,4 +260,88 @@ async def get_server_info(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get server info: {str(e)}"
+        )
+
+
+@router.post("/invoke-broadcast", response_model=InvokeBroadcastResponse)
+async def invoke_tool_broadcast(
+    request: InvokeBroadcastRequest,
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    Invoke a tool on multiple MCP servers and return all results.
+
+    This endpoint implements the "broadcast and let LLM filter" pattern:
+    - Calls the same tool on multiple servers (based on tags or explicit list)
+    - Returns ALL results to the caller (typically an LLM)
+    - The LLM filters/processes results based on user query context
+
+    Use cases:
+    - Query logs from multiple clusters (campaign-cluster, event-cluster)
+    - Search data across distributed systems
+    - Aggregate information from multiple sources
+
+    Args:
+        request: Broadcast invocation request with tool name, params, and server filters
+        user: Authenticated user from JWT
+
+    Returns:
+        InvokeBroadcastResponse with results from all servers
+
+    Example:
+        POST /mcp/invoke-broadcast
+        {
+            "tool_name": "get_logs",
+            "parameters": {"query": "campaign failure"},
+            "tags": ["elk-logs"]  // Query all servers with "elk-logs" tag
+        }
+
+        Response includes results from all matching servers for LLM to process.
+    """
+    username = user.get("preferred_username", "unknown")
+    groups = user.get("groups", [])
+    tool_name = request.tool_name
+
+    # For broadcast, check permission against wildcard resource
+    # This allows user to query multiple servers if they have broad access
+    resource = f"mcp:*:{tool_name}"
+
+    # Check permission
+    is_allowed, reason = policy_engine.check_permission(
+        username,
+        resource,
+        "invoke_tool",
+        groups=groups
+    )
+
+    if not is_allowed:
+        audit_logger.log_mcp_request(
+            user=username,
+            action="invoke_tool_broadcast",
+            tool_name=tool_name,
+            parameters=request.parameters,
+            status="denied",
+            policy_decision=reason
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied: {reason}"
+        )
+
+    try:
+        # Broadcast to multiple servers
+        result = await mcp_proxy.invoke_tool_broadcast(
+            tool_name=tool_name,
+            user=username,
+            parameters=request.parameters,
+            mcp_servers=request.mcp_servers,
+            tags=request.tags
+        )
+
+        return InvokeBroadcastResponse(**result)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Broadcast invocation failed: {str(e)}"
         )

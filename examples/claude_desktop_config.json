@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "enterprise-gateway": {
+      "command": "node",
+      "args": [],
+      "env": {},
+      "url": "http://localhost:8000",
+      "transport": "http"
+    }
+  }
+}

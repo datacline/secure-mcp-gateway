@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
-from typing import Optional, Dict, List
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, List, Literal
+from enum import Enum
 import yaml
 from pathlib import Path
 
@@ -43,6 +45,48 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
 
+class AuthMethod(str, Enum):
+    """Supported authentication methods"""
+    API_KEY = "api_key"
+    BEARER = "bearer"
+    BASIC = "basic"
+    OAUTH2 = "oauth2"
+    CUSTOM = "custom"
+    NONE = "none"
+
+
+class AuthLocation(str, Enum):
+    """Where to place the auth credential"""
+    HEADER = "header"
+    QUERY = "query"
+    BODY = "body"
+
+
+class AuthFormat(str, Enum):
+    """How to format the credential"""
+    RAW = "raw"
+    PREFIX = "prefix"
+    TEMPLATE = "template"
+
+
+class MCPAuthConfig(BaseModel):
+    """Authentication configuration for MCP server"""
+    method: AuthMethod = Field(default=AuthMethod.NONE, description="Authentication method")
+    location: AuthLocation = Field(default=AuthLocation.HEADER, description="Where to place credentials")
+    name: str = Field(default="Authorization", description="Header/query/body parameter name")
+    format: AuthFormat = Field(default=AuthFormat.PREFIX, description="How to format the credential")
+    prefix: str = Field(default="Bearer ", description="Prefix for the credential (e.g., 'Bearer ', 'ApiKey ')")
+    template: Optional[str] = Field(default=None, description="Template for custom format: {credential}")
+    credential_ref: Optional[str] = Field(default=None, description="Reference to credential (vault://, env://, file://)")
+    credential_value: Optional[str] = Field(default=None, description="Direct credential value (not recommended)")
+    tenant_scope: Optional[Literal["org", "team", "user"]] = Field(default=None, description="Tenant scoping")
+    allowed_hosts: Optional[List[str]] = Field(default=None, description="Restrict auth to specific hosts")
+    metadata: Optional[Dict[str, str]] = Field(default=None, description="Additional auth metadata")
+
+    class Config:
+        use_enum_values = True
+
+
 class MCPServerConfig:
     """MCP Server configuration"""
 
@@ -64,7 +108,8 @@ class MCPServerConfig:
                     'url': 'http://localhost:3000',
                     'type': 'http',
                     'timeout': 30,
-                    'enabled': True
+                    'enabled': True,
+                    'auth': None
                 }
             }
             self._save_config()
@@ -83,15 +128,27 @@ class MCPServerConfig:
         return list(self.servers.keys())
 
     def add_server(self, name: str, url: str, server_type: str = 'http',
-                   timeout: int = 30, enabled: bool = True):
+                   timeout: int = 30, enabled: bool = True, auth_config: Optional[Dict] = None):
         """Add or update MCP server configuration"""
         self.servers[name] = {
             'url': url,
             'type': server_type,
             'timeout': timeout,
-            'enabled': enabled
+            'enabled': enabled,
+            'auth': auth_config
         }
         self._save_config()
+
+    def get_auth_config(self, name: str) -> Optional[MCPAuthConfig]:
+        """Get parsed authentication configuration for a server"""
+        server = self.get_server(name)
+        if not server or not server.get('auth'):
+            return None
+
+        try:
+            return MCPAuthConfig(**server['auth'])
+        except Exception:
+            return None
 
     def remove_server(self, name: str) -> bool:
         """Remove MCP server configuration"""
@@ -105,6 +162,28 @@ class MCPServerConfig:
         """Get all enabled MCP servers"""
         return {name: config for name, config in self.servers.items()
                 if config.get('enabled', True)}
+
+    def get_servers_by_tags(self, tags: List[str]) -> List[str]:
+        """Get MCP servers that have any of the specified tags"""
+        matching_servers = []
+        for name, config in self.servers.items():
+            if not config.get('enabled', True):
+                continue
+            server_tags = config.get('tags', [])
+            if any(tag in server_tags for tag in tags):
+                matching_servers.append(name)
+        return matching_servers
+
+    def get_servers_with_tool(self, tool_name: str) -> List[str]:
+        """Get all servers that provide a specific tool"""
+        matching_servers = []
+        for name, config in self.servers.items():
+            if not config.get('enabled', True):
+                continue
+            tools = config.get('tools', [])
+            if tool_name in tools or '*' in tools:  # '*' means server provides all tools
+                matching_servers.append(name)
+        return matching_servers
 
 
 # Global instances
