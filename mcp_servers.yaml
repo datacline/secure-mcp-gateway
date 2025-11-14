@@ -12,7 +12,7 @@ servers:
 
   # Mock server (only works in Docker)
   mock-server:
-    url: http://localhost:3000
+    url: http://mock-mcp-server:3000
     type: http
     timeout: 30
     enabled: true
