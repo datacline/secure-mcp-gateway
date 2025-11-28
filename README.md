@@ -1,20 +1,19 @@
 # Secure MCP Gateway
 
-A secure gateway for proxying and managing access to Model Context Protocol (MCP) servers with JWT authentication, RBAC policy enforcement, and comprehensive auditing capabilities.
+A secure gateway for proxying and managing access to Model Context Protocol (MCP) servers with JWT/OAuth2 authentication and comprehensive auditing capabilities.
 
 ## Overview
 
 The Secure MCP Gateway acts as a **security and governance layer** between AI agents and MCP servers. It does not manage or execute tools itself - instead, it provides:
 
 - **Authentication** - JWT/Keycloak token validation with JWKS
-- **Authorization** - YAML-based RBAC policies with Casbin
 - **Proxying** - Secure forwarding of requests to pre-built MCP servers
 - **Auditing** - Structured JSON logs of all operations
 
 ## Architecture
 
 ```
-AI Agent (with JWT) → Gateway (Auth + Policy + Audit) → Pre-built MCP Server → Tools
+AI Agent (with JWT/OAuth2) → Gateway (Auth + Audit) → Pre-built MCP Server → Tools
 ```
 
 The gateway is a **pure proxy** - MCP servers are pre-built and registered with the gateway for secure access.
@@ -22,7 +21,7 @@ The gateway is a **pure proxy** - MCP servers are pre-built and registered with 
 ## Features
 
 - **JWT Authentication** - Keycloak integration with JWKS validation and token caching
-- **RBAC Policy Engine** - Flexible, YAML-based policies using Casbin
+- **OAuth2 Support** - Full OAuth 2.0/2.1 support for MCP clients (VS Code, Claude Desktop)
 - **MCP Server Proxy** - Forward requests to configured MCP servers
 - **Structured Audit Logging** - JSON-formatted logs to file and/or stdout
 - **Container Ready** - Docker and docker-compose support
@@ -33,29 +32,34 @@ The gateway is a **pure proxy** - MCP servers are pre-built and registered with 
 ```
 secure-mcp-gateway/
 ├── server/
-│   ├── main.py                 # FastAPI application entry point
-│   ├── models.py               # Pydantic data models
-│   ├── config.py               # Configuration management
-│   ├── auth.py                 # JWT authentication & validation
-│   ├── mcp_proxy.py            # MCP server proxy engine
+│   ├── main.py                    # FastAPI application entry point
+│   ├── models.py                  # Pydantic data models
+│   ├── config.py                  # Configuration management
+│   ├── auth/                      # Authentication modules
+│   │   ├── jwt_auth.py            # JWT authentication & validation
+│   │   └── mcp_auth.py            # OAuth2 token introspection
 │   ├── routes/
-│   │   └── mcp.py              # MCP proxy API endpoints
-│   ├── policies/
-│   │   └── policy_engine.py    # Casbin RBAC engine
-│   ├── sandbox/
-│   │   └── runner.py           # Tool execution (legacy)
+│   │   ├── mcp.py                 # Legacy REST API endpoints
+│   │   ├── mcp_standard.py        # Standard MCP protocol (Claude Desktop)
+│   │   ├── mcp_protocol.py        # MCP JSON-RPC endpoint
+│   │   └── oauth_proxy.py         # OAuth2 discovery endpoints
 │   ├── audit/
-│   │   └── logger.py           # Structured audit logging
-│   └── db.py                   # Database layer (SQLAlchemy)
+│   │   └── logger.py              # Structured audit logging
+│   ├── mcp_proxy.py               # MCP server proxy engine
+│   ├── mcp_client.py              # MCP client for server communication
+│   ├── mcp_aggregator.py          # Tool aggregation across servers
+│   └── db.py                      # Database layer (SQLAlchemy)
 ├── cli/
-│   └── datacline.py            # CLI management tool
-├── policies/
-│   └── policy.yaml             # RBAC policy configuration
-├── examples/                   # Example configurations
+│   └── datacline.py               # CLI management tool
+├── docs/
+│   ├── OAUTH2_SETUP.md            # OAuth2 configuration guide
+│   ├── CLAUDE_DESKTOP_CONFIG.md   # Claude Desktop setup
+│   └── MCP_PROTOCOL_IMPLEMENTATION.md  # MCP protocol details
+├── examples/                      # Example configurations
 ├── tests/
 ├── Dockerfile
 ├── docker-compose.yml
-├── mcp_servers.yaml            # MCP server registry
+├── mcp_servers.yaml               # MCP server registry
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -400,6 +404,142 @@ servers:
 
 **No manual server selection required!** The gateway and Claude handle everything.
 
+### Broadcast Tools for AI Agents
+
+The gateway automatically creates **broadcast tools** that AI agents can use to query multiple MCP servers simultaneously. This is perfect for distributed systems where the same tool exists across multiple servers.
+
+#### How Broadcast Tools Work
+
+When the gateway discovers that a tool exists on **multiple servers**, it automatically generates two types of broadcast tools:
+
+**1. Tool-Based Broadcast** (`broadcast__<tool_name>`):
+```
+If "search_logs" exists on: prod-elk-1, prod-elk-2, staging-elk
+Gateway creates: broadcast__search_logs
+
+AI agent sees:
+  - prod-elk-1__search_logs (single server)
+  - prod-elk-2__search_logs (single server)
+  - staging-elk__search_logs (single server)
+  - broadcast__search_logs (ALL servers) ← New!
+```
+
+**2. Tag-Based Broadcast** (`broadcast__by_tag__<tag>`):
+```
+Servers tagged with "logging": prod-elk-1, prod-elk-2, staging-elk
+Gateway creates: broadcast__by_tag__logging
+
+AI agent can execute ANY tool across all "logging" servers
+```
+
+#### Example: AI Agent Usage
+
+**Configuration** ([mcp_servers.yaml](mcp_servers.yaml)):
+```yaml
+servers:
+  prod-elk-1:
+    url: https://elk-prod-1.example.com
+    tags: ["logging", "production"]
+
+  prod-elk-2:
+    url: https://elk-prod-2.example.com
+    tags: ["logging", "production"]
+
+  staging-elk:
+    url: https://elk-staging.example.com
+    tags: ["logging", "staging"]
+```
+
+**AI Agent Discovers These Tools**:
+```
+Regular tools:
+  - prod-elk-1__search_logs
+  - prod-elk-2__search_logs
+  - staging-elk__search_logs
+
+Broadcast tools (auto-generated):
+  - broadcast__search_logs          ← Queries all 3 servers
+  - broadcast__by_tag__logging      ← Execute any tool across logging servers
+  - broadcast__by_tag__production   ← Execute any tool across production servers
+```
+
+**User Asks Claude Desktop**:
+> "Search for authentication errors across all production log servers in the last hour"
+
+**Claude Automatically Uses**:
+```json
+{
+  "tool": "broadcast__search_logs",
+  "arguments": {
+    "arguments": {
+      "query": "authentication error",
+      "time_range": "1h"
+    },
+    "servers": ["prod-elk-1", "prod-elk-2"]  // Filters to production only
+  }
+}
+```
+
+**Claude Receives Aggregated Results**:
+```
+================================================================================
+BROADCAST RESULTS: search_logs
+================================================================================
+Total Servers: 2
+Successful: 2
+Failed: 0
+Execution Time: 1247ms
+
+RESULTS BY SERVER:
+--------------------------------------------------------------------------------
+
+[prod-elk-1]
+{
+  "hits": 145,
+  "logs": [
+    {"timestamp": "2025-01-20T15:30:00Z", "message": "Auth token expired", ...},
+    ...
+  ]
+}
+
+[prod-elk-2]
+{
+  "hits": 89,
+  "logs": [
+    {"timestamp": "2025-01-20T15:29:50Z", "message": "Invalid credentials", ...},
+    ...
+  ]
+}
+================================================================================
+```
+
+**Claude Analyzes and Responds**:
+> "I found 234 authentication errors across your production servers in the last hour.
+> The spike started at 15:29:50 on prod-elk-2 with 'Invalid credentials' errors,
+> followed by token expiration errors on prod-elk-1 at 15:30:00. This suggests
+> a cascading authentication failure starting from the credential service."
+
+#### Benefits for AI Agents
+
+✅ **Automatic Discovery**: No need to configure broadcast tools - they're auto-generated
+✅ **Intelligent Filtering**: AI agent receives all results and filters based on user intent
+✅ **Concurrent Execution**: Gateway queries all servers in parallel
+✅ **Error Resilience**: Failed servers don't block successful results
+✅ **Context Awareness**: AI agent can correlate data across distributed systems
+
+#### When to Use Broadcast Tools
+
+**Use broadcast tools when**:
+- Searching logs across multiple clusters
+- Checking health/status across distributed databases
+- Querying metrics from multiple monitoring systems
+- Finding data that could be on any of several servers
+
+**Use single-server tools when**:
+- You know exactly which server has the data
+- The tool is unique to one server
+- You want to minimize latency and cost
+
 ### Standard MCP Endpoints
 
 The gateway implements these standard MCP protocol endpoints:
@@ -607,8 +747,6 @@ JWT_ALGORITHM=RS256
 # Database
 DATABASE_URL=postgresql://user:pass@localhost:5432/mcp_gateway
 
-# Policies
-POLICY_FILE=policies/policy.yaml
 
 # Audit
 AUDIT_LOG_FILE=audit.json
@@ -617,7 +755,9 @@ AUDIT_TO_STDOUT=true
 
 ### MCP Servers Configuration
 
-Edit `mcp_servers.yaml` to configure MCP servers:
+Edit `mcp_servers.yaml` to configure MCP servers. The gateway supports automatic **broadcast tool generation** for servers that share the same tools or tags.
+
+#### Basic Configuration
 
 ```yaml
 servers:
@@ -673,6 +813,272 @@ servers:
       format: template
       template: "CustomToken {credential}"
       credential_ref: env://CUSTOM_API_TOKEN
+```
+
+#### Configuration for Broadcast Tools
+
+To enable broadcast functionality, configure multiple servers with **tags** to group related servers:
+
+```yaml
+servers:
+  # Production ELK Cluster - Node 1
+  prod-elk-1:
+    url: https://elk-prod-1.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    description: "Production ELK cluster - Node 1"
+    tags:
+      - logging          # Tag for broadcast grouping
+      - production       # Environment tag
+      - elk-cluster      # System type tag
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+
+  # Production ELK Cluster - Node 2
+  prod-elk-2:
+    url: https://elk-prod-2.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    description: "Production ELK cluster - Node 2"
+    tags:
+      - logging
+      - production
+      - elk-cluster
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+
+  # Staging ELK Server
+  staging-elk:
+    url: https://elk-staging.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    description: "Staging ELK server"
+    tags:
+      - logging
+      - staging
+      - elk-cluster
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+
+  # Production Database Cluster - Primary
+  prod-db-primary:
+    url: https://db-prod-primary.example.com
+    type: http
+    timeout: 30
+    enabled: true
+    description: "Production database - Primary"
+    tags:
+      - database
+      - production
+      - postgres
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://DB_API_TOKEN
+
+  # Production Database Cluster - Replica
+  prod-db-replica:
+    url: https://db-prod-replica.example.com
+    type: http
+    timeout: 30
+    enabled: true
+    description: "Production database - Replica"
+    tags:
+      - database
+      - production
+      - postgres
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://DB_API_TOKEN
+```
+
+#### How Broadcast Tools Are Generated
+
+Based on the configuration above, the gateway automatically creates:
+
+**1. Tool-Based Broadcast** (if same tool exists on multiple servers):
+```
+If all ELK servers provide "search_logs" tool:
+  → Gateway creates: broadcast__search_logs
+
+If all DB servers provide "check_health" tool:
+  → Gateway creates: broadcast__check_health
+```
+
+**2. Tag-Based Broadcast** (for each tag with 2+ servers):
+```
+Tag "logging" → broadcast__by_tag__logging
+  - Servers: prod-elk-1, prod-elk-2, staging-elk
+
+Tag "production" → broadcast__by_tag__production
+  - Servers: prod-elk-1, prod-elk-2, prod-db-primary, prod-db-replica
+
+Tag "database" → broadcast__by_tag__database
+  - Servers: prod-db-primary, prod-db-replica
+
+Tag "elk-cluster" → broadcast__by_tag__elk_cluster
+  - Servers: prod-elk-1, prod-elk-2, staging-elk
+```
+
+#### AI Agent Tool Discovery
+
+When Claude Desktop or VS Code connects to the gateway, they discover:
+
+```
+Regular Tools (single server):
+  ✓ prod-elk-1__search_logs
+  ✓ prod-elk-2__search_logs
+  ✓ staging-elk__search_logs
+  ✓ prod-db-primary__check_health
+  ✓ prod-db-replica__check_health
+
+Broadcast Tools (auto-generated):
+  ✓ broadcast__search_logs              (queries all ELK servers)
+  ✓ broadcast__check_health             (queries all DB servers)
+  ✓ broadcast__by_tag__logging          (any tool across logging servers)
+  ✓ broadcast__by_tag__production       (any tool across production servers)
+  ✓ broadcast__by_tag__database         (any tool across database servers)
+  ✓ broadcast__by_tag__elk_cluster      (any tool across ELK cluster)
+```
+
+#### Best Practices for Broadcast Configuration
+
+**1. Use Consistent Tags**
+```yaml
+# Good - consistent tagging scheme
+tags: ["logging", "production", "us-west"]
+tags: ["logging", "staging", "us-east"]
+
+# Bad - inconsistent tags
+tags: ["logs", "prod"]
+tags: ["logging-system", "production-env"]
+```
+
+**2. Group by Function and Environment**
+```yaml
+tags:
+  - "database"      # Function
+  - "production"    # Environment
+  - "postgres"      # Technology
+  - "us-west-1"     # Region
+```
+
+**3. Enable Broadcast for Distributed Systems**
+```yaml
+# Multi-region logging
+servers:
+  logs-us-west:
+    tags: ["logging", "production", "us-west"]
+  logs-us-east:
+    tags: ["logging", "production", "us-east"]
+  logs-eu-central:
+    tags: ["logging", "production", "eu-central"]
+
+# Creates: broadcast__by_tag__logging (queries all 3 regions)
+```
+
+**4. Separate Production and Non-Production**
+```yaml
+# Production
+tags: ["logging", "production"]
+
+# Staging
+tags: ["logging", "staging"]
+
+# Development
+tags: ["logging", "development"]
+
+# This allows AI agents to filter:
+# - "Search production logs only" → uses production tag
+# - "Search all logs" → uses logging tag (all environments)
+```
+
+#### Example: Complete Multi-Region Setup
+
+```yaml
+servers:
+  # US West Region
+  elk-us-west-1:
+    url: https://elk-us-west-1.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    tags: ["logging", "production", "us-west", "elk"]
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+
+  # US East Region
+  elk-us-east-1:
+    url: https://elk-us-east-1.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    tags: ["logging", "production", "us-east", "elk"]
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+
+  # EU Central Region
+  elk-eu-central-1:
+    url: https://elk-eu-central-1.example.com
+    type: http
+    timeout: 60
+    enabled: true
+    tags: ["logging", "production", "eu-central", "elk"]
+    auth:
+      method: bearer
+      location: header
+      name: Authorization
+      format: prefix
+      prefix: "Bearer "
+      credential_ref: env://ELK_API_TOKEN
+```
+
+**AI Agent Usage Examples:**
+```
+User: "Search for errors in US regions only"
+Claude uses: broadcast__by_tag__us_west + broadcast__by_tag__us_east
+
+User: "Search for errors across all production servers"
+Claude uses: broadcast__by_tag__production
+
+User: "Search logs in EU only"
+Claude uses: elk-eu-central-1__search_logs (single server)
+```
 
   # File-based credential
   file-auth:
@@ -715,54 +1121,138 @@ servers:
 - `template` - Use a template string with `{credential}` placeholder
 ```
 
-### Policy Configuration
+## Popular MCP Servers Configuration
 
-Define RBAC policies in `policies/policy.yaml`:
+### Figma MCP Server
+
+Configure Figma MCP server for design file access and collaboration.
+
+**1. Get Figma API Token:**
+- Go to [Figma Account Settings](https://www.figma.com/settings)
+- Scroll to "Personal access tokens"
+- Click "Create new token"
+- Copy the token (shown only once)
+
+**2. Configure in `mcp_servers.yaml`:**
 
 ```yaml
-# Role definitions
-roles:
-  admin:
-    permissions:
-      - resource: "*"
-        actions: ["*"]
-
-  developer:
-    permissions:
-      - resource: "mcp:dev-server:*"
-        actions: ["list_tools", "invoke_tool"]
-
-  analyst:
-    permissions:
-      - resource: "mcp:*:read_only_tool"
-        actions: ["invoke_tool"]
-
-# User-to-role mappings
-user_roles:
-  admin@example.com:
-    - admin
-  dev@example.com:
-    - developer
-
-# Custom rules
-rules:
-  - name: "Block dangerous tools in production"
-    condition:
-      mcp_server: "prod-server"
-      tool_name_pattern: ".*delete.*|.*drop.*"
-    action: deny
-    priority: 100
-
-# Default policy
-default_policy: deny
+servers:
+  figma:
+    url: "https://api.figma.com/v1"
+    type: "http"
+    timeout: 30
+    enabled: true
+    auth:
+      method: "bearer"
+      location: "header"
+      name: "Authorization"
+      format: "prefix"
+      prefix: "Bearer "
+      credential_ref: "env://FIGMA_API_TOKEN"
+    tags:
+      - "design"
+      - "collaboration"
 ```
 
-**Resource Format:** `mcp:{server_name}:{tool_name}`
+**3. Set Environment Variable:**
 
-**Examples:**
-- `mcp:prod-server:*` - All tools on prod-server
-- `mcp:*:sqlite_reader` - sqlite_reader tool on any server
-- `mcp:*:*` - All tools on all servers
+```bash
+# .env
+FIGMA_API_TOKEN=your_figma_token_here
+```
+
+**4. Verify Connection:**
+
+```bash
+curl -X POST http://localhost:8000/mcp \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "params": {"server": "figma"},
+    "id": 1
+  }'
+```
+
+### GitHub MCP Server
+
+Configure GitHub MCP server for repository access, issues, and pull requests.
+
+**1. Create GitHub Personal Access Token:**
+- Go to [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens)
+- Click "Generate new token (classic)"
+- Select scopes: `repo`, `read:org`, `read:user`
+- Generate and copy the token
+
+**2. Configure in `mcp_servers.yaml`:**
+
+```yaml
+servers:
+  github:
+    url: "https://api.github.com"
+    type: "http"
+    timeout: 30
+    enabled: true
+    auth:
+      method: "bearer"
+      location: "header"
+      name: "Authorization"
+      format: "prefix"
+      prefix: "Bearer "
+      credential_ref: "env://GITHUB_TOKEN"
+    tags:
+      - "version-control"
+      - "collaboration"
+```
+
+**3. Set Environment Variable:**
+
+```bash
+# .env
+GITHUB_TOKEN=ghp_your_github_token_here
+```
+
+**4. Verify Connection:**
+
+```bash
+curl -X POST http://localhost:8000/mcp \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "params": {"server": "github"},
+    "id": 1
+  }'
+```
+
+**Common GitHub MCP Tools:**
+- `list_repositories` - List user/org repositories
+- `get_repository` - Get repository details
+- `create_issue` - Create a new issue
+- `list_pull_requests` - List PRs
+- `get_file_contents` - Read file from repository
+
+### Notion MCP Server
+
+Already configured in the project. See [mcp_servers.yaml](mcp_servers.yaml) for the complete configuration.
+
+```yaml
+servers:
+  notion:
+    url: "http://localhost:3001"
+    type: "http"
+    timeout: 30
+    enabled: true
+    auth:
+      method: "bearer"
+      location: "header"
+      name: "Authorization"
+      format: "prefix"
+      prefix: "Bearer "
+      credential_ref: "env://NOTION_API_KEY"
+```
 
 ## CLI Commands
 
@@ -796,6 +1286,23 @@ datacline register-mcp custom-api https://custom.example.com \
   --auth-template "CustomToken {credential}" \
   --credential-ref env://CUSTOM_TOKEN
 
+# Register with tags for broadcast functionality
+datacline register-mcp prod-elk-1 https://elk-prod-1.example.com \
+  --tags "logging,production,elk-cluster" \
+  --auth-method bearer \
+  --credential-ref env://ELK_API_TOKEN
+
+# Register multi-region servers with tags
+datacline register-mcp elk-us-west-1 https://elk-us-west-1.example.com \
+  --tags "logging,production,us-west,elk" \
+  --auth-method bearer \
+  --credential-ref env://ELK_API_TOKEN
+
+datacline register-mcp elk-us-east-1 https://elk-us-east-1.example.com \
+  --tags "logging,production,us-east,elk" \
+  --auth-method bearer \
+  --credential-ref env://ELK_API_TOKEN
+
 # MCP Operations (requires auth token)
 datacline list-tools <server> --token <jwt>                      # List tools
 datacline invoke <server> <tool> --params '{}' --token <jwt>    # Invoke tool
@@ -809,7 +1316,39 @@ datacline invoke-broadcast <tool> --format json                  # JSON output
 
 ## Authentication
 
-### Getting a JWT Token
+The gateway supports two authentication methods:
+
+### 1. OAuth2 for MCP Clients (VS Code, Claude Desktop)
+
+For interactive MCP clients that support OAuth2, the gateway provides full OAuth 2.0/2.1 support with PKCE.
+
+**Quick Setup:**
+
+1. Enable OAuth authentication in `.env`:
+   ```bash
+   MCP_AUTH_ENABLED=true
+   MCP_OAUTH_CLIENT_ID=tes-mcp-client
+   MCP_OAUTH_CLIENT_SECRET=your_secret_here
+   MCP_RESOURCE_SERVER_URL=http://localhost:8000/mcp
+   ```
+
+2. Configure Keycloak client for your MCP client (VS Code, etc.)
+
+3. Restart gateway:
+   ```bash
+   docker-compose restart mcp-gateway
+   ```
+
+**📖 Complete guide:** See [docs/OAUTH2_SETUP.md](docs/OAUTH2_SETUP.md) for detailed configuration instructions.
+
+**OAuth Discovery Endpoints:**
+- `GET /.well-known/oauth-authorization-server` - Authorization server metadata (RFC 8414)
+- `GET /.well-known/oauth-protected-resource` - Protected resource metadata (RFC 8707)
+- `GET /.well-known/openid-configuration` - OpenID Connect discovery
+
+### 2. JWT Tokens for API Access
+
+For programmatic access via REST API or CLI:
 
 #### With Keycloak (Production)
 
@@ -830,8 +1369,12 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/mcp/servers
 #### Development (No Auth)
 
 ```bash
-# Start server without authentication
-datacline serve --no-auth
+# Disable authentication in .env
+AUTH_ENABLED=false
+MCP_AUTH_ENABLED=false
+
+# Restart services
+docker-compose restart mcp-gateway
 ```
 
 ## Audit Logging
@@ -850,7 +1393,6 @@ All operations are logged in structured JSON format:
   "tool_name": "sqlite_reader",
   "parameters": {"database": "data.db"},
   "status": "success",
-  "policy_decision": "allowed by user permission",
   "duration_ms": 45,
   "response_status": 200
 }
@@ -913,7 +1455,6 @@ pytest tests/
    ```bash
    datacline register-mcp my-server http://localhost:3000
    ```
-3. Configure policies in `policies/policy.yaml`
 4. Test access:
    ```bash
    datacline list-tools my-server --token <jwt>
@@ -922,7 +1463,6 @@ pytest tests/
 ### Extending the Gateway
 
 - **Custom authentication**: Modify [server/auth.py](server/auth.py)
-- **Custom policies**: Edit [policies/policy.yaml](policies/policy.yaml)
 - **Custom audit handlers**: Extend [server/audit/logger.py](server/audit/logger.py)
 - **Database migration**: Update `DATABASE_URL` in `.env` (supports PostgreSQL, MySQL, SQLite)
 
@@ -955,17 +1495,6 @@ curl http://localhost:8080
 
 # Test authentication
 make test-auth
-```
-
-### Policy Denials
-
-```bash
-# Check audit logs for policy decisions
-tail -f audit.json | jq 'select(.event_type == "policy_violation")'
-
-# Verify user roles
-# Edit policies/policy.yaml and restart gateway
-docker-compose restart mcp-gateway
 ```
 
 ### MCP Server Connection Issues
@@ -1021,7 +1550,6 @@ See [LICENSE](LICENSE) file for details.
 - [ ] Prometheus metrics integration
 - [ ] OpenTelemetry tracing
 - [ ] Multi-tenancy support
-- [ ] Policy approval workflows
 
 ---
 

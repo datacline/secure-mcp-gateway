@@ -67,4 +67,4 @@ test-auth:
 	  | python3 -c "import sys, json; print(json.load(sys.stdin)[\"access_token\"])"); \
 	echo "Token obtained!"; echo ""; \
 	echo "Testing /mcp/servers endpoint:"; \
-	curl -s -H "Authorization: Bearer $$TOKEN" http://localhost:8000/mcp/servers | python3 -m json.tool'
+	curl -s -H "Authorization: Bearer $$TOKEN" http://localhost:8000/mcp | python3 -m json.tool'
