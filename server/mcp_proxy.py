@@ -128,11 +128,10 @@ class MCPProxy:
     async def list_tools(
         self,
         mcp_server: str,
-        user: str,
-        filters: Optional[Dict[str, Any]] = None
+        user: str
     ) -> Dict[str, Any]:
         """
-        List tools from an MCP server
+        List tools from an MCP server using proper MCP protocol
 
         Args:
             mcp_server: MCP server name
@@ -156,59 +155,42 @@ class MCPProxy:
             if not server_config.get('enabled', True):
                 raise ValueError(f"MCP server '{mcp_server}' is disabled")
 
-            # Build request URL
-            base_url = server_config['url']
-            url = f"{base_url}/tools"
+            # Get MCP server URL
+            url = server_config['url']
 
-            # Prepare request components
+            # Prepare authentication headers
             headers = {}
-            params = filters or {}
-
-            # Apply authentication if configured
             auth_config = mcp_config.get_auth_config(mcp_server)
             if auth_config:
-                headers, params, _ = self._apply_authentication(auth_config, headers, params)
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
 
-            # Make request to MCP server
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    url,
-                    headers=headers,
-                    params=params,
-                    timeout=server_config.get('timeout', self.timeout)
-                )
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
 
-                duration_ms = int((time.time() - start_time) * 1000)
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,  # Use streamable HTTP by default
+                auth_headers=headers
+            )
 
-                response.raise_for_status()
-                result = response.json()
+            # List tools using MCP protocol
+            tools = await client.list_tools()
 
-                # Log successful request
-                audit_logger.log_mcp_request(
-                    user=user,
-                    action="list_tools",
-                    mcp_server=mcp_server,
-                    status="success",
-                    duration_ms=duration_ms,
-                    response_status=response.status_code
-                )
-
-                return result
-
-        except httpx.HTTPError as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            error_msg = f"HTTP error: {str(e)}"
 
+            # Log successful request
             audit_logger.log_mcp_request(
                 user=user,
                 action="list_tools",
                 mcp_server=mcp_server,
-                status="error",
+                status="success",
                 duration_ms=duration_ms,
-                error=error_msg
+                response_status=200
             )
 
-            raise Exception(error_msg)
+            return {"tools": tools}
 
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -223,7 +205,7 @@ class MCPProxy:
                 error=error_msg
             )
 
-            raise
+            raise Exception(f"Failed to list tools: {error_msg}")
 
     async def invoke_tool(
         self,
@@ -233,7 +215,7 @@ class MCPProxy:
         parameters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Invoke a tool on an MCP server
+        Invoke a tool on an MCP server using proper MCP protocol
 
         Args:
             mcp_server: MCP server name
@@ -258,67 +240,47 @@ class MCPProxy:
             if not server_config.get('enabled', True):
                 raise ValueError(f"MCP server '{mcp_server}' is disabled")
 
-            # Build request URL
-            base_url = server_config['url']
-            url = f"{base_url}/tools/{tool_name}/invoke"
+            # Get MCP server URL
+            url = server_config['url']
 
-            # Prepare request components
+            # Prepare authentication headers
             headers = {}
-            params = {}
-            json_body = parameters or {}
-
-            # Apply authentication if configured
             auth_config = mcp_config.get_auth_config(mcp_server)
             if auth_config:
-                headers, params, json_body = self._apply_authentication(
-                    auth_config, headers, params, json_body
-                )
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
 
-            # Make request to MCP server
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    url,
-                    headers=headers,
-                    params=params,
-                    json=json_body,
-                    timeout=server_config.get('timeout', self.timeout)
-                )
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
 
-                duration_ms = int((time.time() - start_time) * 1000)
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,  # Use streamable HTTP by default
+                auth_headers=headers
+            )
 
-                response.raise_for_status()
-                result = response.json()
+            # Call tool using MCP protocol
+            result = await client.call_tool(
+                tool_name=tool_name,
+                arguments=parameters
+            )
 
-                # Log successful invocation
-                audit_logger.log_mcp_request(
-                    user=user,
-                    action="invoke_tool",
-                    mcp_server=mcp_server,
-                    tool_name=tool_name,
-                    parameters=parameters,
-                    status="success",
-                    duration_ms=duration_ms,
-                    response_status=response.status_code
-                )
-
-                return result
-
-        except httpx.HTTPError as e:
             duration_ms = int((time.time() - start_time) * 1000)
-            error_msg = f"HTTP error: {str(e)}"
 
+            # Log successful invocation
             audit_logger.log_mcp_request(
                 user=user,
                 action="invoke_tool",
                 mcp_server=mcp_server,
                 tool_name=tool_name,
                 parameters=parameters,
-                status="error",
+                status="success",
                 duration_ms=duration_ms,
-                error=error_msg
+                response_status=200
             )
 
-            raise Exception(error_msg)
+            return result
 
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -335,7 +297,7 @@ class MCPProxy:
                 error=error_msg
             )
 
-            raise
+            raise Exception(f"Failed to invoke tool: {error_msg}")
 
     async def get_server_info(self, mcp_server: str, user: str) -> Dict[str, Any]:
         """
@@ -410,9 +372,343 @@ class MCPProxy:
         """Get list of configured MCP servers"""
         return mcp_config.list_servers()
 
+    def get_all_servers(self) -> Dict[str, dict]:
+        """Get all configured MCP servers (both enabled and disabled)"""
+        return mcp_config.get_all_servers()
+
     def get_enabled_servers(self) -> Dict[str, dict]:
         """Get all enabled MCP servers"""
         return mcp_config.get_enabled_servers()
+
+    async def list_resources(
+        self,
+        mcp_server: str,
+        user: str
+    ) -> Dict[str, Any]:
+        """
+        List resources from an MCP server using proper MCP protocol
+
+        Args:
+            mcp_server: MCP server name
+            user: Authenticated user
+
+        Returns:
+            Dict containing list of resources
+
+        Raises:
+            Exception: If request fails
+        """
+        start_time = time.time()
+
+        try:
+            # Get MCP server configuration
+            server_config = mcp_config.get_server(mcp_server)
+            if not server_config:
+                raise ValueError(f"MCP server '{mcp_server}' not configured")
+
+            if not server_config.get('enabled', True):
+                raise ValueError(f"MCP server '{mcp_server}' is disabled")
+
+            # Get MCP server URL
+            url = server_config['url']
+
+            # Prepare authentication headers
+            headers = {}
+            auth_config = mcp_config.get_auth_config(mcp_server)
+            if auth_config:
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
+
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
+
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,  # Use streamable HTTP by default
+                auth_headers=headers
+            )
+
+            # List resources using MCP protocol
+            resources = await client.list_resources()
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful request
+            audit_logger.log_mcp_request(
+                user=user,
+                action="list_resources",
+                mcp_server=mcp_server,
+                status="success",
+                duration_ms=duration_ms,
+                response_status=200
+            )
+
+            return {"resources": resources}
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            error_msg = str(e)
+
+            audit_logger.log_mcp_request(
+                user=user,
+                action="list_resources",
+                mcp_server=mcp_server,
+                status="error",
+                duration_ms=duration_ms,
+                error=error_msg
+            )
+
+            raise Exception(f"Failed to list resources: {error_msg}")
+
+    async def read_resource(
+        self,
+        mcp_server: str,
+        uri: str,
+        user: str
+    ) -> Dict[str, Any]:
+        """
+        Read a resource from an MCP server using proper MCP protocol
+
+        Args:
+            mcp_server: MCP server name
+            uri: Resource URI to read
+            user: Authenticated user
+
+        Returns:
+            Dict containing resource content
+
+        Raises:
+            Exception: If request fails
+        """
+        start_time = time.time()
+
+        try:
+            # Get MCP server configuration
+            server_config = mcp_config.get_server(mcp_server)
+            if not server_config:
+                raise ValueError(f"MCP server '{mcp_server}' not configured")
+
+            if not server_config.get('enabled', True):
+                raise ValueError(f"MCP server '{mcp_server}' is disabled")
+
+            # Get MCP server URL
+            url = server_config['url']
+
+            # Prepare authentication headers
+            headers = {}
+            auth_config = mcp_config.get_auth_config(mcp_server)
+            if auth_config:
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
+
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
+
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,
+                auth_headers=headers
+            )
+
+            # Read resource using MCP protocol
+            result = await client.read_resource(uri=uri)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful request
+            audit_logger.log_mcp_request(
+                user=user,
+                action="read_resource",
+                mcp_server=mcp_server,
+                status="success",
+                duration_ms=duration_ms,
+                response_status=200
+            )
+
+            return result
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            error_msg = str(e)
+
+            audit_logger.log_mcp_request(
+                user=user,
+                action="read_resource",
+                mcp_server=mcp_server,
+                status="error",
+                duration_ms=duration_ms,
+                error=error_msg
+            )
+
+            raise Exception(f"Failed to read resource: {error_msg}")
+
+    async def list_prompts(
+        self,
+        mcp_server: str,
+        user: str
+    ) -> Dict[str, Any]:
+        """
+        List prompts from an MCP server using proper MCP protocol
+
+        Args:
+            mcp_server: MCP server name
+            user: Authenticated user
+
+        Returns:
+            Dict containing list of prompts
+
+        Raises:
+            Exception: If request fails
+        """
+        start_time = time.time()
+
+        try:
+            # Get MCP server configuration
+            server_config = mcp_config.get_server(mcp_server)
+            if not server_config:
+                raise ValueError(f"MCP server '{mcp_server}' not configured")
+
+            if not server_config.get('enabled', True):
+                raise ValueError(f"MCP server '{mcp_server}' is disabled")
+
+            # Get MCP server URL
+            url = server_config['url']
+
+            # Prepare authentication headers
+            headers = {}
+            auth_config = mcp_config.get_auth_config(mcp_server)
+            if auth_config:
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
+
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
+
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,
+                auth_headers=headers
+            )
+
+            # List prompts using MCP protocol
+            prompts = await client.list_prompts()
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful request
+            audit_logger.log_mcp_request(
+                user=user,
+                action="list_prompts",
+                mcp_server=mcp_server,
+                status="success",
+                duration_ms=duration_ms,
+                response_status=200
+            )
+
+            return {"prompts": prompts}
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            error_msg = str(e)
+
+            audit_logger.log_mcp_request(
+                user=user,
+                action="list_prompts",
+                mcp_server=mcp_server,
+                status="error",
+                duration_ms=duration_ms,
+                error=error_msg
+            )
+
+            raise Exception(f"Failed to list prompts: {error_msg}")
+
+    async def get_prompt(
+        self,
+        mcp_server: str,
+        name: str,
+        user: str,
+        arguments: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Get a prompt from an MCP server using proper MCP protocol
+
+        Args:
+            mcp_server: MCP server name
+            name: Prompt name
+            user: Authenticated user
+            arguments: Optional prompt arguments
+
+        Returns:
+            Dict containing prompt content
+
+        Raises:
+            Exception: If request fails
+        """
+        start_time = time.time()
+
+        try:
+            # Get MCP server configuration
+            server_config = mcp_config.get_server(mcp_server)
+            if not server_config:
+                raise ValueError(f"MCP server '{mcp_server}' not configured")
+
+            if not server_config.get('enabled', True):
+                raise ValueError(f"MCP server '{mcp_server}' is disabled")
+
+            # Get MCP server URL
+            url = server_config['url']
+
+            # Prepare authentication headers
+            headers = {}
+            auth_config = mcp_config.get_auth_config(mcp_server)
+            if auth_config:
+                headers, _, _ = self._apply_authentication(auth_config, headers, {}, None)
+
+            # Import MCP client
+            from server.mcp_client import MCPHTTPClient
+
+            # Create MCP client
+            client = MCPHTTPClient(
+                url=url,
+                timeout=server_config.get('timeout', self.timeout),
+                use_sse=False,
+                auth_headers=headers
+            )
+
+            # Get prompt using MCP protocol
+            result = await client.get_prompt(name=name, arguments=arguments)
+
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful request
+            audit_logger.log_mcp_request(
+                user=user,
+                action="get_prompt",
+                mcp_server=mcp_server,
+                status="success",
+                duration_ms=duration_ms,
+                response_status=200
+            )
+
+            return result
+
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            error_msg = str(e)
+
+            audit_logger.log_mcp_request(
+                user=user,
+                action="get_prompt",
+                mcp_server=mcp_server,
+                status="error",
+                duration_ms=duration_ms,
+                error=error_msg
+            )
+
+            raise Exception(f"Failed to get prompt: {error_msg}")
 
     async def invoke_tool_broadcast(
         self,
@@ -514,10 +810,10 @@ class MCPProxy:
         parameters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Helper method to invoke tool on a single server (for broadcast)
+        Helper method to invoke tool on a single server using MCP protocol (for broadcast)
 
         Args:
-            client: HTTP client (reused across requests)
+            client: HTTP client (not used for MCP SSE, kept for compatibility)
             mcp_server: MCP server name
             tool_name: Tool name
             user: User identifier
@@ -526,40 +822,13 @@ class MCPProxy:
         Returns:
             Tool execution result
         """
-        # Get server configuration
-        server_config = mcp_config.get_server(mcp_server)
-        if not server_config:
-            raise ValueError(f"MCP server '{mcp_server}' not configured")
-
-        if not server_config.get('enabled', True):
-            raise ValueError(f"MCP server '{mcp_server}' is disabled")
-
-        # Build request
-        base_url = server_config['url']
-        url = f"{base_url}/tools/{tool_name}/invoke"
-
-        headers = {}
-        params = {}
-        json_body = parameters or {}
-
-        # Apply authentication if configured
-        auth_config = mcp_config.get_auth_config(mcp_server)
-        if auth_config:
-            headers, params, json_body = self._apply_authentication(
-                auth_config, headers, params, json_body
-            )
-
-        # Make request
-        response = await client.post(
-            url,
-            headers=headers,
-            params=params,
-            json=json_body,
-            timeout=server_config.get('timeout', self.timeout)
+        # Use the main invoke_tool method which now uses MCP protocol
+        return await self.invoke_tool(
+            mcp_server=mcp_server,
+            tool_name=tool_name,
+            user=user,
+            parameters=parameters
         )
-
-        response.raise_for_status()
-        return response.json()
 
 
 # Global MCP proxy instance

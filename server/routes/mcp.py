@@ -3,10 +3,10 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
 from server.auth import get_current_user, get_optional_user
 from server.mcp_proxy import mcp_proxy
-from server.policies.policy_engine import policy_engine
 from server.audit.logger import audit_logger
 from server.config import settings
 
+# MCP routes - updated to show all servers (enabled and disabled)
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
@@ -90,31 +90,7 @@ async def list_tools(
         ListToolsResponse with tools
     """
     username = user.get("preferred_username", "unknown")
-    groups = user.get("groups", [])
 
-    # Build resource identifier: mcp:server_name:*
-    resource = f"mcp:{mcp_server}:*"
-
-    # Check permission
-    is_allowed, reason = policy_engine.check_permission(
-        username,
-        resource,
-        "list_tools",
-        groups=groups
-    )
-
-    if not is_allowed:
-        audit_logger.log_mcp_request(
-            user=username,
-            action="list_tools",
-            mcp_server=mcp_server,
-            status="denied",
-            policy_decision=reason
-        )
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied: {reason}"
-        )
 
     try:
         # Proxy request to MCP server
@@ -151,34 +127,8 @@ async def invoke_tool(
         InvokeToolResponse with results
     """
     username = user.get("preferred_username", "unknown")
-    groups = user.get("groups", [])
     tool_name = request.tool_name
 
-    # Build resource identifier: mcp:server_name:tool_name
-    resource = f"mcp:{mcp_server}:{tool_name}"
-
-    # Check permission
-    is_allowed, reason = policy_engine.check_permission(
-        username,
-        resource,
-        "invoke_tool",
-        groups=groups
-    )
-
-    if not is_allowed:
-        audit_logger.log_mcp_request(
-            user=username,
-            action="invoke_tool",
-            mcp_server=mcp_server,
-            tool_name=tool_name,
-            parameters=request.parameters,
-            status="denied",
-            policy_decision=reason
-        )
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied: {reason}"
-        )
 
     try:
         # Proxy request to MCP server
@@ -206,20 +156,165 @@ async def invoke_tool(
         )
 
 
+@router.get("/list-resources")
+async def list_resources(
+    mcp_server: str = Query(..., description="MCP server name"),
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    List resources from an MCP server
+
+    Args:
+        mcp_server: MCP server name
+        user: Authenticated user from JWT
+
+    Returns:
+        Dict with resources list
+    """
+    username = user.get("preferred_username", "unknown")
+
+
+    try:
+        # Proxy request to MCP server
+        result = await mcp_proxy.list_resources(mcp_server, username)
+
+        return {
+            "mcp_server": mcp_server,
+            "resources": result.get("resources", []),
+            "count": len(result.get("resources", []))
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list resources: {str(e)}"
+        )
+
+
+@router.get("/read-resource")
+async def read_resource(
+    mcp_server: str = Query(..., description="MCP server name"),
+    uri: str = Query(..., description="Resource URI to read"),
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    Read a resource from an MCP server
+
+    Args:
+        mcp_server: MCP server name
+        uri: Resource URI to read
+        user: Authenticated user from JWT
+
+    Returns:
+        Resource content
+    """
+    username = user.get("preferred_username", "unknown")
+
+
+    try:
+        # Proxy request to MCP server
+        result = await mcp_proxy.read_resource(mcp_server, uri, username)
+
+        return {
+            "mcp_server": mcp_server,
+            "uri": uri,
+            "contents": result.get("contents", [])
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read resource: {str(e)}"
+        )
+
+
+@router.get("/list-prompts")
+async def list_prompts(
+    mcp_server: str = Query(..., description="MCP server name"),
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    List prompts from an MCP server
+
+    Args:
+        mcp_server: MCP server name
+        user: Authenticated user from JWT
+
+    Returns:
+        Dict with prompts list
+    """
+    username = user.get("preferred_username", "unknown")
+
+
+    try:
+        # Proxy request to MCP server
+        result = await mcp_proxy.list_prompts(mcp_server, username)
+
+        return {
+            "mcp_server": mcp_server,
+            "prompts": result.get("prompts", []),
+            "count": len(result.get("prompts", []))
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list prompts: {str(e)}"
+        )
+
+
+@router.get("/get-prompt")
+async def get_prompt(
+    mcp_server: str = Query(..., description="MCP server name"),
+    name: str = Query(..., description="Prompt name"),
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    Get a prompt from an MCP server
+
+    Args:
+        mcp_server: MCP server name
+        name: Prompt name
+        user: Authenticated user from JWT
+
+    Returns:
+        Prompt content
+    """
+    username = user.get("preferred_username", "unknown")
+
+
+    try:
+        # Proxy request to MCP server
+        result = await mcp_proxy.get_prompt(mcp_server, name, username, arguments=None)
+
+        return {
+            "mcp_server": mcp_server,
+            "name": name,
+            "messages": result.get("messages", []),
+            "description": result.get("description")
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get prompt: {str(e)}"
+        )
+
+
 @router.get("/servers")
 async def list_servers(
     user: Dict[str, Any] = Depends(get_user_conditional)
 ):
     """
-    List configured MCP servers
+    List all configured MCP servers (both enabled and disabled)
 
     Args:
         user: Authenticated user from JWT
 
     Returns:
-        Dict with configured servers
+        Dict with all configured servers
     """
-    servers = mcp_proxy.get_enabled_servers()
+    servers = mcp_proxy.get_all_servers()
 
     return {
         "servers": [
@@ -227,7 +322,9 @@ async def list_servers(
                 "name": name,
                 "url": config["url"],
                 "type": config.get("type", "http"),
-                "enabled": config.get("enabled", True)
+                "enabled": config.get("enabled", True),
+                "description": config.get("description", ""),
+                "tags": config.get("tags", [])
             }
             for name, config in servers.items()
         ],
@@ -299,34 +396,12 @@ async def invoke_tool_broadcast(
         Response includes results from all matching servers for LLM to process.
     """
     username = user.get("preferred_username", "unknown")
-    groups = user.get("groups", [])
     tool_name = request.tool_name
 
     # For broadcast, check permission against wildcard resource
     # This allows user to query multiple servers if they have broad access
     resource = f"mcp:*:{tool_name}"
 
-    # Check permission
-    is_allowed, reason = policy_engine.check_permission(
-        username,
-        resource,
-        "invoke_tool",
-        groups=groups
-    )
-
-    if not is_allowed:
-        audit_logger.log_mcp_request(
-            user=username,
-            action="invoke_tool_broadcast",
-            tool_name=tool_name,
-            parameters=request.parameters,
-            status="denied",
-            policy_decision=reason
-        )
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied: {reason}"
-        )
 
     try:
         # Broadcast to multiple servers

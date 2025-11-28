@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "secure-gateway": {
+      "transport": "http",
+      "url": "http://localhost:8000/mcp",
+      "auth": {
+        "type": "oauth2",
+        "flow": "authorizationCode",
+        "authorizationEndpoint": "http://localhost:8080/realms/mcp-gateway/protocol/openid-connect/auth",
+        "tokenEndpoint": "http://localhost:8080/realms/mcp-gateway/protocol/openid-connect/token",
+        "clientId": "vscode-mcp-client",
+        "scope": [
+          "mcp:tools",
+          "openid"
+        ],
+        "pkce": true
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from server.routes import mcp, mcp_standard
+from server.routes import mcp, mcp_standard, mcp_protocol, oauth_proxy
 from server.config import settings
 
 # Configure logging
@@ -26,6 +26,12 @@ app.add_middleware(
 )
 
 # Include routers
+# OAuth2 proxy endpoints (for VS Code and other MCP clients)
+app.include_router(oauth_proxy.router)
+
+# MCP Protocol Aggregator (native MCP protocol for Claude Desktop)
+app.include_router(mcp_protocol.router)
+
 # Standard MCP protocol endpoints (for Claude Desktop, Cursor, etc.)
 app.include_router(mcp_standard.router)
 

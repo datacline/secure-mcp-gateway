@@ -5,7 +5,6 @@ from server.models import ToolInvokeRequest, ToolInvokeResponse
 from server.db import db
 from server.sandbox.runner import sandbox_runner
 from server.audit.logger import audit_logger
-from server.policies.policy_engine import policy_engine
 
 router = APIRouter(prefix="/api/invoke", tags=["invoke"])
 
@@ -36,10 +35,6 @@ async def invoke_tool(request: ToolInvokeRequest):
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
 
     # Check permission
-    if not policy_engine.check_permission(user, tool_name, "execute") and \
-       not policy_engine.check_permission(user, "*", "execute"):
-        audit_logger.log_policy_violation(tool_name, user, "execute", "Permission denied")
-        raise HTTPException(status_code=403, detail="Permission denied")
 
     try:
         # Parse tool configuration

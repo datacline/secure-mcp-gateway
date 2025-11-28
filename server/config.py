@@ -25,11 +25,6 @@ class Settings(BaseSettings):
     jwt_audience: Optional[str] = None
     token_cache_ttl: int = 300  # 5 minutes
 
-    # Policy settings
-    policy_file: str = "policies/policy.yaml"
-    casbin_model: str = "server/policies/rbac_model.conf"
-    casbin_policy: str = "server/policies/rbac_policy.csv"
-
     # MCP settings
     mcp_servers_config: str = "mcp_servers.yaml"
 
@@ -39,6 +34,13 @@ class Settings(BaseSettings):
 
     # Proxy settings
     proxy_timeout: int = 60
+
+    # MCP OAuth2 settings
+    mcp_auth_enabled: bool = False
+    mcp_oauth_client_id: Optional[str] = "mcp-server"
+    mcp_oauth_client_secret: Optional[str] = None
+    mcp_resource_server_url: Optional[str] = "http://localhost:8000/mcp"
+    mcp_required_scopes: str = "mcp:tools, openid, profile, email"
 
     class Config:
         env_file = ".env"
@@ -157,6 +159,10 @@ class MCPServerConfig:
             self._save_config()
             return True
         return False
+
+    def get_all_servers(self) -> Dict[str, dict]:
+        """Get all configured MCP servers (both enabled and disabled)"""
+        return self.servers.copy()
 
     def get_enabled_servers(self) -> Dict[str, dict]:
         """Get all enabled MCP servers"""

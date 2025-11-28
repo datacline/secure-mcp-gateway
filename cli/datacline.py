@@ -69,6 +69,7 @@ def serve(host: str, port: int, reload: bool, auth: bool):
 @click.option('--timeout', default=30, help='Request timeout in seconds')
 @click.option('--enabled/--disabled', default=True, help='Enable/disable server')
 @click.option('--description', help='Server description')
+@click.option('--tags', help='Comma-separated list of tags for broadcast grouping (e.g., "logging,production,us-west")')
 @click.option('--auth-method', type=click.Choice(['api_key', 'bearer', 'basic', 'oauth2', 'custom', 'none']),
               help='Authentication method')
 @click.option('--auth-location', type=click.Choice(['header', 'query', 'body']), default='header',
@@ -81,7 +82,7 @@ def serve(host: str, port: int, reload: bool, auth: bool):
 @click.option('--credential-ref', help='Credential reference (env://VAR, file:///path, vault://path)')
 @click.option('--credential-value', help='Direct credential value (NOT recommended for production)')
 def register_mcp(name: str, url: str, server_type: str, timeout: int, enabled: bool,
-                 description: Optional[str], auth_method: Optional[str], auth_location: str,
+                 description: Optional[str], tags: Optional[str], auth_method: Optional[str], auth_location: str,
                  auth_name: str, auth_format: str, auth_prefix: str, auth_template: Optional[str],
                  credential_ref: Optional[str], credential_value: Optional[str]):
     """Register an MCP server in the configuration"""
@@ -108,6 +109,11 @@ def register_mcp(name: str, url: str, server_type: str, timeout: int, enabled: b
 
         if description:
             server_config['description'] = description
+
+        # Add tags if specified
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(',')]
+            server_config['tags'] = tag_list
 
         # Build auth configuration if specified
         if auth_method:
@@ -147,6 +153,8 @@ def register_mcp(name: str, url: str, server_type: str, timeout: int, enabled: b
         click.echo(f"URL: {url}")
         click.echo(f"Type: {server_type}")
         click.echo(f"Enabled: {enabled}")
+        if tags:
+            click.echo(f"Tags: {', '.join(tag_list)}")
         if auth_method:
             click.echo(f"Auth: {auth_method} ({auth_location})")
             if credential_ref:

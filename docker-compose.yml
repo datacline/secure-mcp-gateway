@@ -75,6 +75,8 @@ services:
       KEYCLOAK_REALM: mcp-gateway
       JWKS_URL: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
       JWT_ALGORITHM: RS256
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-mcp-gateway-client}
+      TOKEN_CACHE_TTL: ${TOKEN_CACHE_TTL:-300}
 
       # Server settings
       HOST: 0.0.0.0
@@ -89,6 +91,18 @@ services:
 
       # Proxy settings
       PROXY_TIMEOUT: 60
+
+      # MCP Server credentials
+      GITHUB_MCP_PAT: ${GITHUB_MCP_PAT}
+      NOTION_TOKEN: ${NOTION_TOKEN}
+      NOTION_MCP_BEARER_TOKEN: ${NOTION_MCP_BEARER_TOKEN}
+
+      # MCP OAuth2 Settings
+      MCP_AUTH_ENABLED: ${MCP_AUTH_ENABLED:-false}
+      MCP_OAUTH_CLIENT_ID: ${MCP_OAUTH_CLIENT_ID:-mcp-server}
+      MCP_OAUTH_CLIENT_SECRET: ${MCP_OAUTH_CLIENT_SECRET}
+      MCP_RESOURCE_SERVER_URL: ${MCP_RESOURCE_SERVER_URL:-http://localhost:8000/mcp}
+      MCP_REQUIRED_SCOPES: ${MCP_REQUIRED_SCOPES:-mcp:tools}
     volumes:
       - ./policies:/app/policies
       - ./mcp_servers.yaml:/app/mcp_servers.yaml
@@ -117,8 +131,8 @@ services:
     volumes:
       - ./docker/mock_mcp_server.py:/app/main.py
     command: >
-      sh -c "pip install --no-cache-dir fastapi uvicorn &&
-             uvicorn main:app --host 0.0.0.0 --port 3000"
+      sh -c "pip install --no-cache-dir mcp sse-starlette starlette uvicorn &&
+             python main.py"
     ports:
       - "3000:3000"
     networks:

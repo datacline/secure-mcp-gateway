@@ -33,7 +33,6 @@ COPY --from=builder /root/.local /root/.local
 # Copy application code
 COPY server/ ./server/
 COPY cli/ ./cli/
-COPY policies/ ./policies/
 COPY examples/ ./examples/
 
 # Create directories for logs and data

@@ -10,7 +10,6 @@ from server.models import (
 from server.db import db
 from server.manifest_parser import ManifestParser
 from server.audit.logger import audit_logger
-from server.policies.policy_engine import policy_engine
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -29,10 +28,6 @@ async def register_tool(request: RegisterToolRequest, user: str = "anonymous"):
     """
     manifest = request.manifest
 
-    # Check permissions
-    if not policy_engine.check_permission(user, manifest.name, "register"):
-        audit_logger.log_policy_violation(manifest.name, user, "register", "Permission denied")
-        raise HTTPException(status_code=403, detail="Permission denied")
 
     try:
         # Validate manifest
@@ -127,23 +122,20 @@ async def list_tools(user: str = "anonymous"):
         # Convert to response models
         tools = []
         for tool_db in tools_db:
-            # Check read permission
-            if policy_engine.check_permission(user, tool_db.name, "read") or \
-               policy_engine.check_permission(user, "*", "read"):
-                tools.append(Tool(
-                    id=tool_db.id,
-                    name=tool_db.name,
-                    version=tool_db.version,
-                    description=tool_db.description,
-                    path=tool_db.path,
-                    permissions=json.loads(tool_db.permissions),
-                    parameters=json.loads(tool_db.parameters) if tool_db.parameters else None,
-                    environment=json.loads(tool_db.environment) if tool_db.environment else None,
-                    timeout=tool_db.timeout,
-                    created_at=tool_db.created_at,
-                    updated_at=tool_db.updated_at,
-                    is_active=tool_db.is_active
-                ))
+            tools.append(Tool(
+                id=tool_db.id,
+                name=tool_db.name,
+                version=tool_db.version,
+                description=tool_db.description,
+                path=tool_db.path,
+                permissions=json.loads(tool_db.permissions),
+                parameters=json.loads(tool_db.parameters) if tool_db.parameters else None,
+                environment=json.loads(tool_db.environment) if tool_db.environment else None,
+                timeout=tool_db.timeout,
+                created_at=tool_db.created_at,
+                updated_at=tool_db.updated_at,
+                is_active=tool_db.is_active
+            ))
 
         return tools
 
@@ -163,11 +155,6 @@ async def get_tool(tool_name: str, user: str = "anonymous"):
     Returns:
         Tool object
     """
-    # Check permission
-    if not policy_engine.check_permission(user, tool_name, "read") and \
-       not policy_engine.check_permission(user, "*", "read"):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     try:
         tool_db = db.get_tool(tool_name)
 
@@ -207,12 +194,6 @@ async def delete_tool(tool_name: str, user: str = "anonymous"):
     Returns:
         Success message
     """
-    # Check permission
-    if not policy_engine.check_permission(user, tool_name, "delete") and \
-       not policy_engine.check_permission(user, "*", "delete"):
-        audit_logger.log_policy_violation(tool_name, user, "delete", "Permission denied")
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     try:
         success = db.delete_tool(tool_name)
 
