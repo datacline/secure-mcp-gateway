@@ -831,5 +831,12 @@ class MCPProxy:
         )
 
 
+
+    def reload_config(self):
+        """Reload MCP server configuration from file"""
+        mcp_config._load_config()
+        logger.info("Reloaded MCP server configuration")
+
 # Global MCP proxy instance
 mcp_proxy = MCPProxy()
+

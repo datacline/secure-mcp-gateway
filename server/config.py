@@ -152,6 +152,27 @@ class MCPServerConfig:
         except Exception:
             return None
 
+    def update_server(self, name: str, **kwargs) -> bool:
+        """Update MCP server configuration
+
+        Args:
+            name: Server name
+            **kwargs: Fields to update (enabled, description, tags, timeout, etc.)
+
+        Returns:
+            True if updated, False if server not found
+        """
+        if name not in self.servers:
+            return False
+
+        # Update only provided fields
+        for key, value in kwargs.items():
+            if value is not None:
+                self.servers[name][key] = value
+
+        self._save_config()
+        return True
+
     def remove_server(self, name: str) -> bool:
         """Remove MCP server configuration"""
         if name in self.servers:
