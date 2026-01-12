@@ -349,6 +349,8 @@ Then restart Claude Desktop. The gateway's tools will appear in Claude's tool li
 
 ### Configure Cursor
 
+#### Option 1: Direct MCP Server Connection
+
 Add to your Cursor MCP settings:
 
 ```json
@@ -364,6 +366,33 @@ Add to your Cursor MCP settings:
   }
 }
 ```
+
+#### Option 2: Hook-Based Policy Enforcement (Recommended)
+
+For policy-based control of MCP execution, use the `beforeMCPExecution` hook:
+
+1. **Install the hook script**:
+```bash
+cp examples/mcp-gateway-hook.sh ~/.cursor/mcp-gateway-hook.sh
+chmod +x ~/.cursor/mcp-gateway-hook.sh
+```
+
+2. **Configure environment**:
+```bash
+export MCP_GATEWAY_API_URL="https://api.yourdomain.com/api/v1/check-mcp-policy"
+export MCP_GATEWAY_API_KEY="sk-your-unique-api-key"
+```
+
+3. **Add to `~/.cursor/hooks.json`**:
+```json
+{
+  "beforeMCPExecution": "~/.cursor/mcp-gateway-hook.sh"
+}
+```
+
+This intercepts all MCP tool execution and checks security policies before allowing execution.
+
+**See**: [Cursor Hook Setup Guide](docs/CURSOR_HOOK_SETUP.md) for detailed configuration and [Quick Reference](docs/CURSOR_HOOK_QUICK_REFERENCE.md) for technical details.
 
 ### Example: Real-World Usage
 
