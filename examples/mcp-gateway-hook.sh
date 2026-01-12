@@ -21,7 +21,8 @@
 #   - Optionally set MCP_GATEWAY_FAIL_OPEN=true for allow-by-default on failures
 #
 
-set -e
+# Don't exit on errors - we handle them gracefully
+set +e
 
 # ============================================================================
 # Configuration
@@ -141,23 +142,23 @@ check_policy() {
       -H "X-API-Key: $GATEWAY_API_KEY" \
       -H "User-Agent: mcp-gateway-hook/1.0" \
       -d "$payload" \
-      2>/dev/null || echo "CURL_ERROR"
+      2>&1
   )
   curl_exit_code=$?
 
-  # Parse response
+  # Parse response - last line is HTTP status, rest is body
   http_status=$(echo "$http_response" | tail -n 1)
   response_body=$(echo "$http_response" | sed '$d')
 
   # Handle curl errors (network failure, timeout, etc.)
-  if [ "$http_status" = "CURL_ERROR" ] || [ $curl_exit_code -ne 0 ]; then
+  if [ $curl_exit_code -ne 0 ]; then
     log_error "Failed to reach gateway API (curl exit code: $curl_exit_code)"
     handle_gateway_unavailable
     return
   fi
 
   # Handle HTTP error responses
-  if [ -z "$http_status" ] || [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
+  if [ -z "$http_status" ] || ! [ "$http_status" -ge 0 ] 2>/dev/null || [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
     log_error "Gateway returned HTTP $http_status"
     log_debug "Response: $response_body"
     handle_gateway_error "$http_status" "$response_body"

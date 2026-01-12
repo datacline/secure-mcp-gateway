@@ -273,13 +273,14 @@ async def check_mcp_policy(
 
         # Audit log the decision
         execution_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-        audit_logger.log_policy_check(
-            tool_name=request.tool_name,
+        audit_logger.log_mcp_request(
+            user=request.user_id or "unknown",
+            action="check_policy",
             mcp_server=request.mcp_server,
-            user_id=request.user_id or "unknown",
-            decision=decision.permission,
-            execution_time_ms=execution_time_ms,
-            reason=decision.user_message or ""
+            tool_name=request.tool_name,
+            status="success",
+            policy_decision=decision.permission,
+            duration_ms=int(execution_time_ms)
         )
 
         logger.debug(f"Policy decision: {decision.permission}")
