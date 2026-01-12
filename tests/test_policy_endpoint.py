@@ -48,8 +48,8 @@ class TestPolicyCheckEndpoint:
             }
         )
 
-        # Should return 401 for missing API key
-        assert response.status_code == 401
+        # Should return 422 for missing required header (Pydantic validation)
+        assert response.status_code == 422
 
     def test_check_policy_with_parameters(self, client):
         """Test policy check with tool parameters"""
