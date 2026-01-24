@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from server.routes import mcp, mcp_standard, mcp_protocol, oauth_proxy
+from server.routes import mcp, mcp_standard, mcp_protocol, oauth_proxy, policy
 from server.config import settings
 
 # Configure logging
@@ -26,6 +26,9 @@ app.add_middleware(
 )
 
 # Include routers
+# Policy enforcement endpoints (Cursor hook integration)
+app.include_router(policy.router)
+
 # OAuth2 proxy endpoints (for VS Code and other MCP clients)
 app.include_router(oauth_proxy.router)
 

@@ -42,9 +42,15 @@ class Settings(BaseSettings):
     mcp_resource_server_url: Optional[str] = "http://localhost:8000/mcp"
     mcp_required_scopes: str = "mcp:tools, openid, profile, email"
 
+    # Policy settings
+    policy_file: Optional[str] = "policies/policy.yaml"
+    casbin_model: Optional[str] = "server/policies/rbac_model.conf"
+    casbin_policy: Optional[str] = "server/policies/rbac_policy.csv"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Allow extra environment variables
 
 
 class AuthMethod(str, Enum):
