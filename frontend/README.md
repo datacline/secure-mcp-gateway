@@ -11,7 +11,7 @@ cd frontend
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Configure Environme
 
 The frontend needs to connect to the backend API. Create a `.env.local` file (already created):
 
