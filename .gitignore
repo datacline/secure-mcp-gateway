@@ -93,7 +93,22 @@ celerybeat.pid
 .env
 .env.local
 .env.*.local
+.env.prod
+.env.production
 .venv
+
+# Sensitive configuration
+*.key
+*.pem
+*.p12
+*.pfx
+.aws/
+.ssh/
+credentials.json
+secrets.json
+*.key.json
+api_keys.txt
+token.txt
 
 # Spyder project settings
 .spyderproject

@@ -1,0 +1,48 @@
+####
+# This Dockerfile builds a native executable using GraalVM
+# Results in a tiny container image (~50MB) with instant startup
+####
+
+# Build stage
+FROM quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 AS builder
+
+WORKDIR /build
+
+# Copy Maven files
+COPY --chown=quarkus:quarkus pom.xml .
+
+# Copy source code
+COPY --chown=quarkus:quarkus src ./src
+
+# Copy configuration
+COPY --chown=quarkus:quarkus mcp_servers.yaml .
+
+# Build native executable
+RUN ./mvnw package -Pnative -DskipTests -B
+
+####
+# Runtime stage - Minimal image
+####
+FROM quay.io/quarkus/quarkus-micro-image:2.0
+
+WORKDIR /app
+
+# Copy the native executable
+COPY --from=builder /build/target/*-runner /app/application
+
+# Copy default configuration
+COPY --from=builder /build/mcp_servers.yaml /app/mcp_servers.yaml
+
+# Create directories
+RUN mkdir -p /app/logs /app/data && \
+    chmod 777 /app/logs /app/data
+
+# Expose port
+EXPOSE 8000
+
+# Health check (using wget since curl may not be available in micro image)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/q/health/ready || exit 1
+
+# Run the native executable
+ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0", "-Dquarkus.http.port=8000"]

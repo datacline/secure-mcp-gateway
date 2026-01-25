@@ -1,0 +1,216 @@
+# Secure MCP Gateway - Spring Boot Configuration
+
+spring:
+  application:
+    name: mcp-gateway
+
+  # Auto-configuration exclusions (conditionally enabled based on auth)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration
+
+  # Database - H2 for development
+  datasource:
+    url: jdbc:h2:file:./data/mcp_gateway;AUTO_SERVER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  # JPA/Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # Flyway migrations
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  # Cache
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
+    cache-names:
+      - jwks-cache
+      - token-cache
+
+# Server configuration
+server:
+  port: ${SERVER_PORT:8000}
+  address: 0.0.0.0
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.datacline.mcpgateway: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n"
+
+# Management/Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Gateway Configuration
+gateway:
+  # Server settings
+  host: 0.0.0.0
+  port: 8000
+
+  # Authentication
+  auth-enabled: ${AUTH_ENABLED:false}
+  keycloak-url: ${KEYCLOAK_URL:http://localhost:8080}
+  keycloak-realm: ${KEYCLOAK_REALM:mcp-gateway}
+  jwks-url: ${JWKS_URL:}
+  jwt-algorithm: ${JWT_ALGORITHM:RS256}
+  jwt-audience: ${JWT_AUDIENCE:mcp-gateway-client}
+  token-cache-ttl: ${TOKEN_CACHE_TTL:300}
+
+  # MCP Configuration
+  mcp-servers-config: ${MCP_SERVERS_CONFIG:mcp_servers.yaml}
+  proxy-timeout: ${PROXY_TIMEOUT:60}
+
+  # MCP OAuth (for VS Code, Claude Desktop)
+  mcp-auth:
+    enabled: ${MCP_AUTH_ENABLED:false}
+    oauth-client-id: ${MCP_OAUTH_CLIENT_ID:tes-mcp-client}
+    oauth-client-secret: ${MCP_OAUTH_CLIENT_SECRET:}
+    resource-server-url: ${MCP_RESOURCE_SERVER_URL:http://localhost:8000/mcp}
+    required-scopes: ${MCP_REQUIRED_SCOPES:openid,profile}
+
+  # Audit logging
+  audit:
+    log-file: ${AUDIT_LOG_FILE:audit.json}
+    to-stdout: ${AUDIT_TO_STDOUT:true}
+    to-database: ${AUDIT_TO_DATABASE:true}
+
+---
+# Development profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:mcp_gateway;DB_CLOSE_DELAY=-1
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+  # Enable H2 console for development
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  level:
+    root: DEBUG
+    com.datacline.mcpgateway: DEBUG
+
+gateway:
+  auth-enabled: false
+
+---
+# Test profile
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+gateway:
+  auth-enabled: false
+
+---
+# Docker profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  # Enable OAuth2 for docker profile
+  autoconfigure:
+    exclude: []
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:mcp_gateway}
+    username: ${DB_USER:mcp_user}
+    password: ${DB_PASSWORD:mcp_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/mcp-gateway
+          jwk-set-uri: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
+
+gateway:
+  auth-enabled: true
+  keycloak-url: http://keycloak:8080
+  jwks-url: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
+
+---
+# Production profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # Enable OAuth2 for prod profile
+  autoconfigure:
+    exclude: []
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
+          jwk-set-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+
+logging:
+  level:
+    root: INFO
+    com.datacline.mcpgateway: INFO
+
+gateway:
+  auth-enabled: true
