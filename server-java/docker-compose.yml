@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mcp-gateway-postgres
+    environment:
+      POSTGRES_USER: mcp_user
+      POSTGRES_PASSWORD: mcp_password
+      POSTGRES_DB: mcp_gateway
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp_user -d mcp_gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mcp-network
+
+  # Keycloak Authentication Server
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    container_name: mcp-gateway-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: mcp_user
+      KC_DB_PASSWORD: mcp_password
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HTTP_ENABLED: 'true'
+    command:
+      - start-dev
+      - --import-realm
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../docker/keycloak-realm.json:/opt/keycloak/data/import/realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mcp-network
+
+  # MCP Gateway (Java/Spring Boot)
+  mcp-gateway-java:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-gateway-java
+    environment:
+      # Server
+      SERVER_PORT: 8000
+      SERVER_ADDRESS: 0.0.0.0
+
+      # Spring Profile
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mcp_gateway
+      SPRING_DATASOURCE_USERNAME: mcp_user
+      SPRING_DATASOURCE_PASSWORD: mcp_password
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+
+      # Authentication
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: mcp-gateway
+
+      # Spring Security OAuth2 Resource Server
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/mcp-gateway
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
+
+      # MCP Configuration
+      MCP_SERVERS_CONFIG: /app/mcp_servers.yaml
+      PROXY_TIMEOUT: 60
+
+      # Audit Logging
+      AUDIT_LOG_FILE: /app/logs/audit.json
+      AUDIT_TO_STDOUT: 'true'
+      AUDIT_TO_DATABASE: 'true'
+
+      # External Credentials (examples)
+      GITHUB_MCP_PAT: ${GITHUB_MCP_PAT:-}
+      NOTION_TOKEN: ${NOTION_TOKEN:-}
+      FIGMA_API_TOKEN: ${FIGMA_API_TOKEN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcp_servers.yaml:/app/mcp_servers.yaml:ro
+      - ../policies:/app/policies:ro
+      - gateway_logs:/app/logs
+      - gateway_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+  # Mock MCP Server (for testing)
+  mock-mcp-server:
+    image: python:3.11-slim
+    container_name: mock-mcp-server
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir mcp sse-starlette starlette uvicorn &&
+             python server.py"
+    volumes:
+      - ../docker/mock_mcp_server.py:/app/server.py:ro
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  gateway_logs:
+    driver: local
+  gateway_data:
+    driver: local
