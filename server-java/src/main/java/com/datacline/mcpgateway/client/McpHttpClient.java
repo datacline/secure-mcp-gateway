@@ -1,9 +1,13 @@
 package com.datacline.mcpgateway.client;
 
+import com.datacline.mcpgateway.config.McpServer;
 import io.modelcontextprotocol.client.McpAsyncClient;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
+import io.modelcontextprotocol.client.transport.ServerParameters;
+import io.modelcontextprotocol.client.transport.StdioClientTransport;
+import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
@@ -328,5 +332,201 @@ public class McpHttpClient {
             out.put("description", r.description());
         }
         return out;
+    }
+
+    // ========================================================================
+    // Overloaded methods that accept McpServer (support both HTTP and stdio)
+    // ========================================================================
+
+    /**
+     * List tools from an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<List<Map<String, Object>>> listTools(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout) {
+        if (server.isStdio()) {
+            return listToolsStdio(server, timeout);
+        } else {
+            return listTools(server.getUrl(), authHeaders, timeout);
+        }
+    }
+
+    /**
+     * Call a tool on an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<Map<String, Object>> callTool(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout,
+            String toolName,
+            Map<String, Object> arguments) {
+        if (server.isStdio()) {
+            return callToolStdio(server, timeout, toolName, arguments);
+        } else {
+            return callTool(server.getUrl(), authHeaders, timeout, toolName, arguments);
+        }
+    }
+
+    /**
+     * List resources from an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<List<Map<String, Object>>> listResources(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout) {
+        if (server.isStdio()) {
+            return listResourcesStdio(server, timeout);
+        } else {
+            return listResources(server.getUrl(), authHeaders, timeout);
+        }
+    }
+
+    /**
+     * Read a resource from an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<Map<String, Object>> readResource(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout,
+            String uri) {
+        if (server.isStdio()) {
+            return readResourceStdio(server, timeout, uri);
+        } else {
+            return readResource(server.getUrl(), authHeaders, timeout, uri);
+        }
+    }
+
+    /**
+     * List prompts from an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<List<Map<String, Object>>> listPrompts(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout) {
+        if (server.isStdio()) {
+            return listPromptsStdio(server, timeout);
+        } else {
+            return listPrompts(server.getUrl(), authHeaders, timeout);
+        }
+    }
+
+    /**
+     * Get a prompt from an MCP server (supports both HTTP and stdio).
+     */
+    public CompletionStage<Map<String, Object>> getPrompt(
+            McpServer server,
+            Map<String, String> authHeaders,
+            Duration timeout,
+            String name,
+            Map<String, Object> arguments) {
+        if (server.isStdio()) {
+            return getPromptStdio(server, timeout, name, arguments);
+        } else {
+            return getPrompt(server.getUrl(), authHeaders, timeout, name, arguments);
+        }
+    }
+
+    // ========================================================================
+    // Stdio-specific methods
+    // ========================================================================
+
+    private CompletionStage<List<Map<String, Object>>> listToolsStdio(McpServer server, Duration timeout) {
+        LOG.info("Listing tools from stdio MCP server: {}", server.getName());
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .doOnSuccess(initResult -> LOG.info("Stdio MCP client initialized successfully"))
+                .flatMap(initResult -> client.listTools())
+                .map(this::toToolsList));
+    }
+
+    private CompletionStage<Map<String, Object>> callToolStdio(
+            McpServer server, Duration timeout, String toolName, Map<String, Object> arguments) {
+        Map<String, Object> args = arguments != null ? arguments : Map.of();
+        CallToolRequest req = CallToolRequest.builder()
+                .name(toolName)
+                .arguments(args)
+                .build();
+
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .flatMap(initResult -> client.callTool(req))
+                .map(this::toCallToolResult));
+    }
+
+    private CompletionStage<List<Map<String, Object>>> listResourcesStdio(McpServer server, Duration timeout) {
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .flatMap(initResult -> client.listResources())
+                .map(this::toResourcesList));
+    }
+
+    private CompletionStage<Map<String, Object>> readResourceStdio(McpServer server, Duration timeout, String uri) {
+        ReadResourceRequest req = new ReadResourceRequest(uri);
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .flatMap(initResult -> client.readResource(req))
+                .map(this::toReadResourceResult));
+    }
+
+    private CompletionStage<List<Map<String, Object>>> listPromptsStdio(McpServer server, Duration timeout) {
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .flatMap(initResult -> client.listPrompts())
+                .map(this::toPromptsList));
+    }
+
+    private CompletionStage<Map<String, Object>> getPromptStdio(
+            McpServer server, Duration timeout, String name, Map<String, Object> arguments) {
+        Map<String, Object> args = arguments != null ? arguments : Map.of();
+        GetPromptRequest req = new GetPromptRequest(name, args);
+
+        return withStdioClient(server, timeout, client -> client.initialize()
+                .flatMap(initResult -> client.getPrompt(req))
+                .map(this::toGetPromptResult));
+    }
+
+    /**
+     * Execute an action with a stdio MCP client.
+     */
+    private <T> CompletionStage<T> withStdioClient(
+            McpServer server,
+            Duration timeout,
+            java.util.function.Function<McpAsyncClient, Mono<T>> action) {
+
+        LOG.info("Creating stdio transport for server: {}", server.getName());
+        LOG.debug("Command: {}, Args: {}", server.getCommand(), server.getArgs());
+
+        // Prepare command and arguments
+        List<String> args = server.getArgs() != null ? server.getArgs() : List.of();
+        Map<String, String> env = server.getEnv() != null ? server.getEnv() : Map.of();
+
+        // Create ServerParameters using builder (command is required in builder())
+        ServerParameters.Builder paramsBuilder = ServerParameters.builder(server.getCommand())
+                .args(args);
+
+        // Add environment variables if present
+        if (!env.isEmpty()) {
+            paramsBuilder.env(env);
+        }
+
+        ServerParameters params = paramsBuilder.build();
+
+        LOG.debug("Server parameters: command={}, args count={}, env keys={}",
+                  server.getCommand(),
+                  args.size(),
+                  env.keySet());
+
+        // Create stdio transport with ServerParameters and default JSON mapper
+        var transport = new StdioClientTransport(params, McpJsonMapper.getDefault());
+
+        // Create async client
+        McpAsyncClient client = McpClient.async(transport)
+                .requestTimeout(timeout)
+                .build();
+
+        Mono<T> mono = action.apply(client)
+                .doOnError(error -> LOG.error("Stdio MCP client operation failed: {}", error.getMessage(), error))
+                .doFinally(signal -> {
+                    LOG.debug("Closing stdio MCP client with signal: {}", signal);
+                    client.closeGracefully().subscribe();
+                });
+
+        return mono.toFuture();
     }
 }

@@ -1,0 +1,122 @@
+# Multi-stage Dockerfile supporting separate builds for evaluation and management services
+
+# ============================================================================
+# Builder Stage - Common
+# ============================================================================
+FROM golang:1.21-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /build
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# ============================================================================
+# Build Evaluation Binary
+# ============================================================================
+FROM builder AS build-evaluation
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /policy-evaluation \
+    ./cmd/evaluation
+
+# ============================================================================
+# Build Management Binary
+# ============================================================================
+FROM builder AS build-management
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /policy-management \
+    ./cmd/management
+
+# ============================================================================
+# Build Combined Binary
+# ============================================================================
+FROM builder AS build-combined
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /policy-engine \
+    ./cmd/server
+
+# ============================================================================
+# Runtime Stage - Evaluation Only
+# ============================================================================
+FROM alpine:3.18 AS evaluation
+
+RUN apk add --no-cache ca-certificates wget && \
+    adduser -D -g '' appuser
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=build-evaluation /policy-evaluation /app/policy-evaluation
+
+# Copy example policies (optional)
+COPY --chown=appuser:appuser policies /app/policies
+
+USER appuser
+
+EXPOSE 9000
+
+ENTRYPOINT ["/app/policy-evaluation"]
+
+# ============================================================================
+# Runtime Stage - Management Only
+# ============================================================================
+FROM alpine:3.18 AS management
+
+RUN apk add --no-cache ca-certificates wget && \
+    adduser -D -g '' appuser
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=build-management /policy-management /app/policy-management
+
+# Copy example policies (optional)
+COPY --chown=appuser:appuser policies /app/policies
+
+USER appuser
+
+EXPOSE 9000
+
+ENTRYPOINT ["/app/policy-management"]
+
+# ============================================================================
+# Runtime Stage - Combined (Default)
+# ============================================================================
+FROM alpine:3.18 AS combined
+
+RUN apk add --no-cache ca-certificates wget && \
+    adduser -D -g '' appuser
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=build-combined /policy-engine /app/policy-engine
+
+# Copy example policies (optional)
+COPY --chown=appuser:appuser policies /app/policies
+
+USER appuser
+
+EXPOSE 9000
+
+ENTRYPOINT ["/app/policy-engine"]
+
+# ============================================================================
+# Build Instructions:
+# ============================================================================
+# Build evaluation-only:
+#   docker build --target evaluation -t policy-evaluation:latest -f Dockerfile.split .
+#
+# Build management-only:
+#   docker build --target management -t policy-management:latest -f Dockerfile.split .
+#
+# Build combined:
+#   docker build --target combined -t policy-engine:latest -f Dockerfile.split .

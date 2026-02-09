@@ -4,6 +4,7 @@ import com.datacline.mcpgateway.config.GatewayConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -26,6 +27,7 @@ public class SecurityConfig {
         if (!gatewayConfig.isAuthEnabled()) {
             // Disable security for development/testing
             return http
+                    .cors(Customizer.withDefaults())
                     .csrf(ServerHttpSecurity.CsrfSpec::disable)
                     .authorizeExchange(exchanges -> exchanges
                             .anyExchange().permitAll()
@@ -35,6 +37,7 @@ public class SecurityConfig {
 
         // Enable OAuth2 JWT authentication for production
         return http
+                .cors(Customizer.withDefaults())
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/**").permitAll()

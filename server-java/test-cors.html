@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test - Java Gateway</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        button {
+            background: #A3D78A;
+            color: black;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 5px;
+        }
+        button:hover {
+            background: #8DC474;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 CORS Test - Java Gateway</h1>
+        <p>Test CORS configuration for MCP configuration endpoints</p>
+
+        <div class="test-section">
+            <h3>Test 1: List Servers (GET)</h3>
+            <p>Tests basic CORS with GET request</p>
+            <button onclick="testListServers()">Run Test</button>
+            <div id="result1"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Get Server Config (GET)</h3>
+            <p>Tests GET request to config endpoint</p>
+            <button onclick="testGetConfig()">Run Test</button>
+            <div id="result2"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Update Config (PUT)</h3>
+            <p>Tests PUT request with credentials</p>
+            <button onclick="testUpdateConfig()">Run Test</button>
+            <div id="result3"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 4: Create Server (POST)</h3>
+            <p>Tests POST request with JSON body</p>
+            <button onclick="testCreateServer()">Run Test</button>
+            <div id="result4"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 5: Delete Server (DELETE)</h3>
+            <p>Tests DELETE request</p>
+            <button onclick="testDeleteServer()">Run Test</button>
+            <div id="result5"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8000';
+
+        function showResult(elementId, success, message, data = null) {
+            const element = document.getElementById(elementId);
+            const className = success ? 'success' : 'error';
+            let content = message;
+            if (data) {
+                content += '\n\nResponse:\n' + JSON.stringify(data, null, 2);
+            }
+            element.innerHTML = `<div class="result ${className}">${content}</div>`;
+        }
+
+        async function testListServers() {
+            const resultId = 'result1';
+            try {
+                showResult(resultId, true, '⏳ Testing...', null);
+                
+                const response = await fetch(`${BASE_URL}/mcp/servers`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult(resultId, true, 
+                    `✅ SUCCESS!\n` +
+                    `Status: ${response.status}\n` +
+                    `Servers found: ${data.count}`, 
+                    data
+                );
+            } catch (error) {
+                showResult(resultId, false, 
+                    `❌ FAILED!\n` +
+                    `Error: ${error.message}\n\n` +
+                    `This usually means CORS is not configured correctly.`
+                );
+            }
+        }
+
+        async function testGetConfig() {
+            const resultId = 'result2';
+            try {
+                showResult(resultId, true, '⏳ Testing...', null);
+
+                // First get list of servers
+                const serversResponse = await fetch(`${BASE_URL}/mcp/servers`, {
+                    credentials: 'include'
+                });
+                const servers = await serversResponse.json();
+
+                if (servers.count === 0) {
+                    showResult(resultId, false, 
+                        `⚠️  No servers found!\n` +
+                        `Add a server to mcp_servers.yaml first.`
+                    );
+                    return;
+                }
+
+                const serverName = servers.servers[0].name;
+
+                const response = await fetch(`${BASE_URL}/mcp/servers/${serverName}/config`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult(resultId, true, 
+                    `✅ SUCCESS!\n` +
+                    `Status: ${response.status}\n` +
+                    `Server: ${serverName}`, 
+                    data
+                );
+            } catch (error) {
+                showResult(resultId, false, 
+                    `❌ FAILED!\n` +
+                    `Error: ${error.message}`
+                );
+            }
+        }
+
+        async function testUpdateConfig() {
+            const resultId = 'result3';
+            try {
+                showResult(resultId, true, '⏳ Testing...', null);
+
+                // First get list of servers
+                const serversResponse = await fetch(`${BASE_URL}/mcp/servers`, {
+                    credentials: 'include'
+                });
+                const servers = await serversResponse.json();
+
+                if (servers.count === 0) {
+                    showResult(resultId, false, 
+                        `⚠️  No servers found!\n` +
+                        `Add a server to mcp_servers.yaml first.`
+                    );
+                    return;
+                }
+
+                const serverName = servers.servers[0].name;
+
+                // Get current config
+                const configResponse = await fetch(`${BASE_URL}/mcp/servers/${serverName}/config`, {
+                    credentials: 'include'
+                });
+                const currentConfig = await configResponse.json();
+
+                // Update with same config (safe test)
+                const response = await fetch(`${BASE_URL}/mcp/servers/${serverName}/config`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    },
+                    body: JSON.stringify(currentConfig)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(JSON.stringify(errorData));
+                }
+
+                const data = await response.json();
+                showResult(resultId, true, 
+                    `✅ SUCCESS!\n` +
+                    `Status: ${response.status}\n` +
+                    `Server: ${serverName}\n` +
+                    `Config updated successfully`, 
+                    data
+                );
+            } catch (error) {
+                showResult(resultId, false, 
+                    `❌ FAILED!\n` +
+                    `Error: ${error.message}`
+                );
+            }
+        }
+
+        async function testCreateServer() {
+            const resultId = 'result4';
+            try {
+                showResult(resultId, true, '⏳ Testing...', null);
+
+                const testServer = {
+                    name: 'cors-test-server',
+                    url: 'http://localhost:9999/mcp',
+                    type: 'http',
+                    enabled: false,
+                    description: 'Test server created by CORS test',
+                    tags: ['test', 'cors'],
+                    tools: ['*']
+                };
+
+                const response = await fetch(`${BASE_URL}/mcp/servers`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer test-token'
+                    },
+                    body: JSON.stringify(testServer)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(JSON.stringify(errorData));
+                }
+
+                const data = await response.json();
+                showResult(resultId, true, 
+                    `✅ SUCCESS!\n` +
+                    `Status: ${response.status}\n` +
+                    `Test server created!\n` +
+                    `(Will be deleted in Test 5)`, 
+                    data
+                );
+            } catch (error) {
+                showResult(resultId, false, 
+                    `❌ FAILED!\n` +
+                    `Error: ${error.message}\n\n` +
+                    `Note: Server may already exist from previous test.`
+                );
+            }
+        }
+
+        async function testDeleteServer() {
+            const resultId = 'result5';
+            try {
+                showResult(resultId, true, '⏳ Testing...', null);
+
+                const response = await fetch(`${BASE_URL}/mcp/servers/cors-test-server`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'Authorization': 'Bearer test-token'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(JSON.stringify(errorData));
+                }
+
+                const data = await response.json();
+                showResult(resultId, true, 
+                    `✅ SUCCESS!\n` +
+                    `Status: ${response.status}\n` +
+                    `Test server deleted!`, 
+                    data
+                );
+            } catch (error) {
+                showResult(resultId, false, 
+                    `❌ FAILED!\n` +
+                    `Error: ${error.message}\n\n` +
+                    `Note: Server may not exist (run Test 4 first).`
+                );
+            }
+        }
+
+        // Show info on load
+        window.addEventListener('load', () => {
+            console.log('CORS Test Page Loaded');
+            console.log('Testing against:', BASE_URL);
+            console.log('Current origin:', window.location.origin);
+        });
+    </script>
+</body>
+</html>

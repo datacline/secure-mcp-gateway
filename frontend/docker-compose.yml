@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  policy-ui:
+    build: .
+    container_name: policy-management-ui
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:9002
+    depends_on:
+      - policy-engine
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+    networks:
+      - policy-network
+
+  # Policy Engine (Management Service)
+  policy-engine:
+    image: policy-management:latest
+    container_name: policy-management
+    ports:
+      - "9002:9000"
+    volumes:
+      - ../policy-engine-go/policies:/app/policies
+    environment:
+      PORT: "9000"
+      POLICY_DIR: "/app/policies"
+      ENABLE_EVALUATION: "false"
+      ENABLE_MANAGEMENT: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+    networks:
+      - policy-network
+
+networks:
+  policy-network:
+    driver: bridge
+
+# Usage:
+#   docker-compose up -d
+#   Access UI: http://localhost:3000
+#   Access API: http://localhost:9002
