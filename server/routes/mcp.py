@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
@@ -420,3 +422,82 @@ async def invoke_tool_broadcast(
             status_code=500,
             detail=f"Broadcast invocation failed: {str(e)}"
         )
+
+
+class UpdateServerRequest(BaseModel):
+    """Request model for updating server configuration"""
+    enabled: Optional[bool] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    timeout: Optional[int] = None
+
+
+@router.patch("/server/{mcp_server}")
+async def update_server(
+    mcp_server: str,
+    request: UpdateServerRequest,
+    user: Dict[str, Any] = Depends(get_user_conditional)
+):
+    """
+    Update MCP server configuration
+    
+    Args:
+        mcp_server: MCP server name
+        request: Update request with fields to change
+        user: Authenticated user from JWT
+        
+    Returns:
+        Updated server configuration
+    """
+    from server.config import mcp_config
+    
+    username = user.get("preferred_username", "unknown")
+    
+    # Check if server exists
+    server = mcp_config.get_server(mcp_server)
+    if not server:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Server '{mcp_server}' not found"
+        )
+    
+    # Prepare update data
+    update_data = {}
+    if request.enabled is not None:
+        update_data['enabled'] = request.enabled
+    if request.description is not None:
+        update_data['description'] = request.description
+    if request.tags is not None:
+        update_data['tags'] = request.tags
+    if request.timeout is not None:
+        update_data['timeout'] = request.timeout
+    
+    # Update server
+    success = mcp_config.update_server(mcp_server, **update_data)
+    
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update server '{mcp_server}'"
+        )
+    
+    # Log the update
+    logger.info(f"Server {mcp_server} updated by {username}: {update_data}")
+    
+    # Reload mcp_proxy configuration
+    mcp_proxy.reload_config()
+    
+    # Return updated configuration
+    updated_server = mcp_config.get_server(mcp_server)
+    return {
+        "success": True,
+        "server": {
+            "name": mcp_server,
+            "url": updated_server["url"],
+            "type": updated_server.get("type", "http"),
+            "enabled": updated_server.get("enabled", True),
+            "description": updated_server.get("description", ""),
+            "tags": updated_server.get("tags", []),
+            "timeout": updated_server.get("timeout", 30)
+        }
+    }
