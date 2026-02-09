@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  policy-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: policy-engine
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./policies:/app/policies:ro
+      - policy_logs:/app/logs
+      - policy_data:/app/data
+    environment:
+      PORT: "9000"
+      POLICY_DIR: "/app/policies"
+      DEBUG: "false"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  policy_logs:
+    driver: local
+  policy_data:
+    driver: local

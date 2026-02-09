@@ -1,0 +1,321 @@
+.policy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.form-col-span-2 {
+  grid-column: span 2;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+/* Rule Editor */
+.rule-editor {
+  padding: 1.5rem;
+  border: 2px solid var(--border);
+  border-radius: 0.75rem;
+  margin-bottom: 1.5rem;
+  background: var(--bg);
+}
+
+.rule-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.rule-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin: -0.5rem;
+  border-radius: 0.375rem;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.rule-toggle-btn:hover {
+  background: var(--bg-hover);
+}
+
+.rule-title {
+  font-weight: 600;
+}
+
+.rule-subtitle {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.rule-editor-content {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.rule-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: end;
+}
+
+.rule-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.rule-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.rule-section-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Condition Row */
+.condition-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) minmax(180px, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.condition-field-select {
+  min-width: 180px;
+}
+
+.condition-operator-select {
+  min-width: 140px;
+}
+
+.condition-value-input {
+  min-width: 180px;
+}
+
+.condition-value-input .input {
+  width: 100%;
+}
+
+/* Action Row */
+.action-row {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+/* Small Input */
+.input-sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* Icon Button */
+.icon-btn {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--bg);
+}
+
+.icon-btn-danger {
+  color: var(--danger);
+}
+
+.icon-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Empty State */
+.empty-state-small {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+}
+
+/* Scope Toggle */
+.scope-toggle-group {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.scope-toggle-option {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scope-toggle-option:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.scope-toggle-option:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(163, 215, 138, 0.1);
+}
+
+.scope-toggle-option input {
+  margin-top: 0.25rem;
+}
+
+.scope-toggle-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.scope-toggle-content strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.scope-toggle-content span {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Scopes Editor */
+.scopes-editor {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.scope-row {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.scope-type-select {
+  min-width: 140px;
+}
+
+.scope-id-input {
+  min-width: 200px;
+}
+
+@media (max-width: 1024px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-col-span-2 {
+    grid-column: span 1;
+  }
+
+  .rule-header {
+    grid-template-columns: 1fr;
+  }
+
+  .condition-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .condition-row .condition-field-select {
+    grid-column: span 2;
+  }
+
+  .condition-row .condition-operator-select {
+    grid-column: span 1;
+  }
+
+  .condition-row .condition-value-input {
+    grid-column: span 1;
+  }
+
+  .condition-row .icon-btn {
+    grid-column: span 2;
+    justify-self: end;
+  }
+
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-toggle-group {
+    flex-direction: column;
+  }
+
+  .scope-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .scope-row .scope-type-select {
+    grid-column: span 1;
+  }
+
+  .scope-row .scope-id-input {
+    grid-column: span 1;
+  }
+
+  .scope-row .icon-btn {
+    grid-column: span 2;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 640px) {
+  .condition-row {
+    grid-template-columns: 1fr;
+  }
+
+  .condition-row .condition-field-select,
+  .condition-row .condition-operator-select,
+  .condition-row .condition-value-input,
+  .condition-row .icon-btn {
+    grid-column: span 1;
+  }
+
+  .condition-row .icon-btn {
+    justify-self: start;
+  }
+}

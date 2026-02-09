@@ -1,0 +1,9 @@
+.policy-create-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.page-header-nav {
+  margin-bottom: 1rem;
+}

@@ -1,0 +1,38 @@
+policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+policy_code: notion-policy-ml8gh27x
+policy_rules:
+    - rule_id: rule-ml8gh27x-wfxxoh
+      priority: 0
+      description: Allow access to 2 selected tool(s)
+      conditions:
+        field: tool.name
+        operator: in
+        value:
+            - API-get-self
+            - API-retrieve-a-page
+      actions:
+        - type: allow
+version: 1
+status: active
+priority: 0
+created_at: 2026-02-04T21:03:58.468319+01:00
+updated_at: 2026-02-04T21:03:58.468319+01:00
+name: notion Access Policy
+description: Access policy for notion MCP server
+resources:
+    - policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+      resource_type: mcp_server
+      resource_id: notion
+    - policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+      resource_type: tool
+      resource_id: notion:API-get-self
+    - policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+      resource_type: tool
+      resource_id: notion:API-retrieve-a-page
+scopes:
+    - policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+      principal_type: user
+      principal_id: user-005
+    - policy_id: 500852e8-d9b9-41c7-ae45-3d79e9eff9c3
+      principal_type: user
+      principal_id: user-004

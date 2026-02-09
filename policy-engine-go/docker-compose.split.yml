@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # Combined service (both evaluation and management)
+  policy-engine-combined:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: combined
+    container_name: policy-engine-combined
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./policies:/app/policies:rw
+    environment:
+      PORT: "9000"
+      POLICY_DIR: "/app/policies"
+      ENABLE_EVALUATION: "true"
+      ENABLE_MANAGEMENT: "true"
+      LOG_LEVEL: "info"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+    networks:
+      - policy-network
+    profiles:
+      - combined
+
+  # Evaluation-only service (high throughput, read-only)
+  policy-evaluation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: evaluation
+    container_name: policy-evaluation
+    ports:
+      - "9001:9000"
+    volumes:
+      - ./policies:/app/policies:ro  # Read-only
+    environment:
+      PORT: "9000"
+      POLICY_DIR: "/app/policies"
+      ENABLE_EVALUATION: "true"
+      ENABLE_MANAGEMENT: "false"
+      LOG_LEVEL: "info"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+    networks:
+      - policy-network
+    profiles:
+      - split
+    deploy:
+      replicas: 3  # Scale out for high throughput
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Management-only service (CRUD operations)
+  policy-management:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: management
+    container_name: policy-management
+    ports:
+      - "9002:9000"
+    volumes:
+      - ./policies:/app/policies:rw  # Read-write for CRUD
+    environment:
+      PORT: "9000"
+      POLICY_DIR: "/app/policies"
+      ENABLE_EVALUATION: "false"
+      ENABLE_MANAGEMENT: "true"
+      LOG_LEVEL: "info"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+    networks:
+      - policy-network
+    profiles:
+      - split
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+networks:
+  policy-network:
+    driver: bridge
+
+# Usage:
+# Combined mode (default):
+#   docker-compose -f docker-compose.split.yml --profile combined up -d
+#
+# Split mode (evaluation + management separated):
+#   docker-compose -f docker-compose.split.yml --profile split up -d
+#
+# Evaluation only:
+#   docker-compose -f docker-compose.split.yml up policy-evaluation
+#
+# Management only:
+#   docker-compose -f docker-compose.split.yml up policy-management

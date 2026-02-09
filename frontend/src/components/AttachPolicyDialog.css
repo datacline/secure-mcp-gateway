@@ -1,0 +1,202 @@
+.attach-policy-dialog {
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.attach-policy-dialog .dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.attach-policy-dialog .error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.attach-policy-dialog .search-section {
+  margin-bottom: 1rem;
+}
+
+.attach-policy-dialog .search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.attach-policy-dialog .search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.attach-policy-dialog .policies-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.attach-policy-dialog .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.attach-policy-dialog .policy-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.attach-policy-dialog .loading-state,
+.attach-policy-dialog .empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.attach-policy-dialog .spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.attach-policy-dialog .hint {
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.attach-policy-dialog .policies-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.attach-policy-dialog .policy-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.attach-policy-dialog .policy-item:last-child {
+  border-bottom: none;
+}
+
+.attach-policy-dialog .policy-item:hover {
+  background: var(--bg-hover);
+}
+
+.attach-policy-dialog .policy-item.selected {
+  background: rgba(163, 215, 138, 0.1);
+  border-left: 3px solid var(--primary);
+}
+
+.attach-policy-dialog .policy-item input[type="radio"] {
+  margin-top: 0.25rem;
+  accent-color: var(--primary);
+}
+
+.attach-policy-dialog .policy-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.attach-policy-dialog .policy-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.attach-policy-dialog .policy-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.attach-policy-dialog .action-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.attach-policy-dialog .action-badge.allow {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.attach-policy-dialog .action-badge.deny {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.attach-policy-dialog .policy-code {
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-family: monospace;
+  margin-bottom: 0.25rem;
+}
+
+.attach-policy-dialog .policy-description {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-policy-dialog .policy-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.attach-policy-dialog .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.attach-policy-dialog .info-section {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(163, 215, 138, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(163, 215, 138, 0.3);
+}
+
+.attach-policy-dialog .info-text {
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0;
+}
+
+.attach-policy-dialog .info-text strong {
+  color: var(--primary);
+}

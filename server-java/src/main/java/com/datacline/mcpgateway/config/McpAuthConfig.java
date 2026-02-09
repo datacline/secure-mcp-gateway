@@ -49,7 +49,13 @@ public record McpAuthConfig(
      * Reference to the credential: env://VAR_NAME, file:///path, vault://path
      */
     @JsonProperty("credential_ref")
-    String credentialRef
+    String credentialRef,
+
+    /**
+     * Direct credential value (used when credential_ref is not set)
+     */
+    @JsonProperty("credential")
+    String credential
 ) {
     /**
      * Authentication methods supported by MCP servers.
@@ -113,12 +119,13 @@ public record McpAuthConfig(
             AuthFormat.RAW,
             Optional.empty(),
             Optional.empty(),
+            null,
             null
         );
     }
 
     /**
-     * Create a bearer token configuration.
+     * Create a bearer token configuration with credential reference.
      */
     public static McpAuthConfig bearer(String credentialRef) {
         return new McpAuthConfig(
@@ -128,12 +135,29 @@ public record McpAuthConfig(
             AuthFormat.PREFIX,
             Optional.of("Bearer "),
             Optional.empty(),
-            credentialRef
+            credentialRef,
+            null
         );
     }
 
     /**
-     * Create an API key configuration.
+     * Create a bearer token configuration with direct credential.
+     */
+    public static McpAuthConfig bearerWithCredential(String credential) {
+        return new McpAuthConfig(
+            AuthMethod.BEARER,
+            AuthLocation.HEADER,
+            "Authorization",
+            AuthFormat.PREFIX,
+            Optional.of("Bearer "),
+            Optional.empty(),
+            null,
+            credential
+        );
+    }
+
+    /**
+     * Create an API key configuration with credential reference.
      */
     public static McpAuthConfig apiKey(String headerName, String credentialRef) {
         return new McpAuthConfig(
@@ -143,7 +167,24 @@ public record McpAuthConfig(
             AuthFormat.RAW,
             Optional.empty(),
             Optional.empty(),
-            credentialRef
+            credentialRef,
+            null
+        );
+    }
+
+    /**
+     * Create an API key configuration with direct credential.
+     */
+    public static McpAuthConfig apiKeyWithCredential(String headerName, String credential) {
+        return new McpAuthConfig(
+            AuthMethod.API_KEY,
+            AuthLocation.HEADER,
+            headerName,
+            AuthFormat.RAW,
+            Optional.empty(),
+            Optional.empty(),
+            null,
+            credential
         );
     }
 
@@ -152,5 +193,23 @@ public record McpAuthConfig(
      */
     public boolean requiresAuth() {
         return method != null && method != AuthMethod.NONE;
+    }
+
+    /**
+     * Check if a direct credential is available (not just a reference).
+     */
+    public boolean hasDirectCredential() {
+        return credential != null && !credential.isEmpty();
+    }
+
+    /**
+     * Get the effective credential: use direct credential if available, otherwise null.
+     * Caller should resolve credentialRef separately if this returns null.
+     */
+    public String getEffectiveCredential() {
+        if (hasDirectCredential()) {
+            return credential;
+        }
+        return null;
     }
 }

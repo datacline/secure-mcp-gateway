@@ -83,7 +83,9 @@ gateway:
 
   # MCP Configuration
   mcp-servers-config: ${MCP_SERVERS_CONFIG:mcp_servers.yaml}
+  migrate-yaml-to-db: ${MIGRATE_YAML_TO_DB:true}
   proxy-timeout: ${PROXY_TIMEOUT:60}
+  policy-engine-url: ${POLICY_ENGINE_URL:http://localhost:9000}
 
   # MCP OAuth (for VS Code, Claude Desktop)
   mcp-auth:
@@ -152,7 +154,38 @@ spring:
     activate:
       on-profile: docker
 
-  # Enable OAuth2 for docker profile
+  # Disable OAuth2 for docker profile by default (can be overridden with AUTH_ENABLED env var)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:mcp_gateway}
+    username: ${DB_USER:mcp_user}
+    password: ${DB_PASSWORD:mcp_password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+gateway:
+  auth-enabled: false
+  keycloak-url: http://keycloak:8080
+  jwks-url: http://keycloak:8080/realms/mcp-gateway/protocol/openid-connect/certs
+
+---
+# Docker profile with OAuth2 enabled
+spring:
+  config:
+    activate:
+      on-profile: docker-with-auth
+
+  # Enable OAuth2 for docker-with-auth profile
   autoconfigure:
     exclude: []
 

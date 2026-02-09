@@ -3,6 +3,7 @@ package com.datacline.mcpgateway.service;
 import com.datacline.mcpgateway.client.McpHttpClient;
 import com.datacline.mcpgateway.config.GatewayConfig;
 import com.datacline.mcpgateway.config.McpAuthConfig;
+import com.datacline.mcpgateway.config.McpServer;
 import com.datacline.mcpgateway.config.McpServerConfig;
 import com.datacline.mcpgateway.service.audit.AuditLogger;
 import org.slf4j.Logger;
@@ -93,37 +94,42 @@ public class McpProxyService {
      * Apply authentication to request headers.
      */
     private Map<String, String> applyAuthentication(
-            McpServerConfig.McpServerEntry serverEntry
+            McpServer serverEntry
     ) {
         Map<String, String> headers = new HashMap<>();
         
-        McpAuthConfig authConfig = serverEntry.auth();
+        McpAuthConfig authConfig = serverEntry.getAuth();
         if (authConfig == null || !authConfig.requiresAuth()) {
-            LOG.debug("No authentication required for server: {}", serverEntry.name());
+            LOG.debug("No authentication required for server: {}", serverEntry.getName());
             return headers;
         }
 
         LOG.debug("Applying authentication for server: {}, method: {}", 
-                  serverEntry.name(), authConfig.method());
+                  serverEntry.getName(), authConfig.method());
 
         try {
-            String credential = resolveCredential(authConfig.credentialRef());
+            // First try direct credential, then fall back to credential reference
+            String credential = authConfig.getEffectiveCredential();
+            if (credential == null && authConfig.credentialRef() != null) {
+                credential = resolveCredential(authConfig.credentialRef());
+            }
+            
             if (credential == null) {
-                LOG.warn("Credential resolved to null for server: {}", serverEntry.name());
+                LOG.warn("No credential available for server: {} (neither direct nor reference)", serverEntry.getName());
                 return headers;
             }
 
             String formattedCredential = formatCredential(authConfig, credential);
             LOG.debug("Formatted credential for server: {}, header: {}, value length: {}", 
-                      serverEntry.name(), authConfig.name(), 
+                      serverEntry.getName(), authConfig.name(), 
                       formattedCredential != null ? formattedCredential.length() : 0);
 
             if (authConfig.location() == McpAuthConfig.AuthLocation.HEADER) {
                 headers.put(authConfig.name(), formattedCredential);
-                LOG.debug("Added auth header: {} for server: {}", authConfig.name(), serverEntry.name());
+                LOG.debug("Added auth header: {} for server: {}", authConfig.name(), serverEntry.getName());
             }
         } catch (Exception e) {
-            LOG.error("Failed to apply authentication for server: {}", serverEntry.name(), e);
+            LOG.error("Failed to apply authentication for server: {}", serverEntry.getName(), e);
             throw e;
         }
 
@@ -149,15 +155,11 @@ public class McpProxyService {
                     return new IllegalArgumentException(errorMsg);
                 }))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.listTools(serverEntry.url(), authHeaders, timeout))
+                            mcpHttpClient.listTools(serverEntry, authHeaders, timeout))
                             .map(tools -> {
                                 long durationMs = System.currentTimeMillis() - startTime;
 
@@ -178,7 +180,7 @@ public class McpProxyService {
                                             "'. Check if the authentication token is set correctly (e.g., NOTION_MCP_BEARER_TOKEN)";
                                 } else if (errorMsg != null && errorMsg.contains("Connection refused")) {
                                     errorMsg = "MCP server '" + mcpServer + "' is not running or not accessible at " + 
-                                            serverEntry.url();
+                                            serverEntry.getUrl();
                                 } else if (errorMsg == null) {
                                     errorMsg = "Unknown error occurred";
                                 }
@@ -217,15 +219,11 @@ public class McpProxyService {
                     return new IllegalArgumentException(errorMsg);
                 }))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.callTool(serverEntry.url(), authHeaders, timeout, toolName, parameters))
+                            mcpHttpClient.callTool(serverEntry, authHeaders, timeout, toolName, parameters))
                             .map(result -> {
                                 long durationMs = System.currentTimeMillis() - startTime;
 
@@ -257,15 +255,11 @@ public class McpProxyService {
         return Mono.fromCallable(() -> mcpServerConfig.getServer(mcpServer)
                 .orElseThrow(() -> new IllegalArgumentException("MCP server '" + mcpServer + "' not configured")))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.listResources(serverEntry.url(), authHeaders, timeout))
+                            mcpHttpClient.listResources(serverEntry, authHeaders, timeout))
                             .map(resources -> Map.<String, Object>of("resources", resources));
                 });
     }
@@ -277,15 +271,11 @@ public class McpProxyService {
         return Mono.fromCallable(() -> mcpServerConfig.getServer(mcpServer)
                 .orElseThrow(() -> new IllegalArgumentException("MCP server '" + mcpServer + "' not configured")))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.readResource(serverEntry.url(), authHeaders, timeout, uri));
+                            mcpHttpClient.readResource(serverEntry, authHeaders, timeout, uri));
                 });
     }
 
@@ -296,15 +286,11 @@ public class McpProxyService {
         return Mono.fromCallable(() -> mcpServerConfig.getServer(mcpServer)
                 .orElseThrow(() -> new IllegalArgumentException("MCP server '" + mcpServer + "' not configured")))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.listPrompts(serverEntry.url(), authHeaders, timeout))
+                            mcpHttpClient.listPrompts(serverEntry, authHeaders, timeout))
                             .map(prompts -> Map.<String, Object>of("prompts", prompts));
                 });
     }
@@ -321,15 +307,11 @@ public class McpProxyService {
         return Mono.fromCallable(() -> mcpServerConfig.getServer(mcpServer)
                 .orElseThrow(() -> new IllegalArgumentException("MCP server '" + mcpServer + "' not configured")))
                 .flatMap(serverEntry -> {
-                    if (!serverEntry.enabled()) {
-                        return Mono.error(new IllegalArgumentException("MCP server '" + mcpServer + "' is disabled"));
-                    }
-
                     Map<String, String> authHeaders = applyAuthentication(serverEntry);
-                    Duration timeout = Duration.ofSeconds(serverEntry.timeout());
+                    Duration timeout = Duration.ofSeconds(serverEntry.getTimeout());
 
                     return Mono.fromCompletionStage(
-                            mcpHttpClient.getPrompt(serverEntry.url(), authHeaders, timeout, name, arguments));
+                            mcpHttpClient.getPrompt(serverEntry, authHeaders, timeout, name, arguments));
                 });
     }
 
@@ -351,13 +333,13 @@ public class McpProxyService {
             targetServers.addAll(mcpServers);
         } else if (tags != null && !tags.isEmpty()) {
             targetServers.addAll(mcpServerConfig.getServersByTags(tags).stream()
-                    .map(McpServerConfig.McpServerEntry::name)
+                    .map(McpServer::getName)
                     .toList());
         } else {
             // Get all enabled servers that have this tool
             targetServers.addAll(mcpServerConfig.getEnabledServers().stream()
                     .filter(s -> s.hasTool(toolName))
-                    .map(McpServerConfig.McpServerEntry::name)
+                    .map(McpServer::getName)
                     .toList());
         }
 
@@ -404,11 +386,13 @@ public class McpProxyService {
         Map<String, Map<String, Object>> servers = new HashMap<>();
         mcpServerConfig.getAllServers().forEach((name, entry) -> {
             Map<String, Object> serverInfo = new HashMap<>();
-            serverInfo.put("url", entry.url());
-            serverInfo.put("type", entry.type());
-            serverInfo.put("enabled", entry.enabled());
-            serverInfo.put("description", entry.description());
-            serverInfo.put("tags", entry.tags());
+            serverInfo.put("url", entry.getUrl());
+            serverInfo.put("type", entry.getType());
+            serverInfo.put("enabled", entry.isEnabled());
+            serverInfo.put("description", entry.getDescription());
+            serverInfo.put("image_icon", entry.getImageIcon());
+            serverInfo.put("policy_id", entry.getPolicyId());
+            serverInfo.put("tags", entry.getTags());
             servers.put(name, serverInfo);
         });
         return servers;
@@ -422,12 +406,14 @@ public class McpProxyService {
                 .orElseThrow(() -> new IllegalArgumentException("MCP server '" + mcpServer + "' not configured")))
                 .map(serverEntry -> {
                     Map<String, Object> info = new HashMap<>();
-                    info.put("name", serverEntry.name());
-                    info.put("url", serverEntry.url());
-                    info.put("type", serverEntry.type());
-                    info.put("enabled", serverEntry.enabled());
-                    info.put("description", serverEntry.description());
-                    info.put("tags", serverEntry.tags());
+                    info.put("name", serverEntry.getName());
+                    info.put("url", serverEntry.getUrl());
+                    info.put("type", serverEntry.getType());
+                    info.put("enabled", serverEntry.isEnabled());
+                    info.put("description", serverEntry.getDescription());
+                    info.put("image_icon", serverEntry.getImageIcon());
+                    info.put("policy_id", serverEntry.getPolicyId());
+                    info.put("tags", serverEntry.getTags());
                     return info;
                 });
     }
@@ -436,10 +422,10 @@ public class McpProxyService {
      * List all tools from all enabled servers (for MCP protocol endpoint).
      */
     public Mono<List<Map<String, Object>>> listAllTools(String user) {
-        Map<String, McpServerConfig.McpServerEntry> servers = mcpServerConfig.getAllServers();
+        Map<String, McpServer> servers = mcpServerConfig.getAllServers();
         
         List<Mono<List<Map<String, Object>>>> toolMonos = servers.entrySet().stream()
-                .filter(entry -> entry.getValue().enabled())
+                .filter(entry -> entry.getValue().isEnabled())
                 .map(entry -> {
                     String serverName = entry.getKey();
                     return listTools(serverName, user)
@@ -468,10 +454,10 @@ public class McpProxyService {
      * List all resources from all enabled servers (for MCP protocol endpoint).
      */
     public Mono<List<Map<String, Object>>> listAllResources(String user) {
-        Map<String, McpServerConfig.McpServerEntry> servers = mcpServerConfig.getAllServers();
+        Map<String, McpServer> servers = mcpServerConfig.getAllServers();
         
         List<Mono<List<Map<String, Object>>>> resourceMonos = servers.entrySet().stream()
-                .filter(entry -> entry.getValue().enabled())
+                .filter(entry -> entry.getValue().isEnabled())
                 .map(entry -> {
                     String serverName = entry.getKey();
                     return listResources(serverName, user)
@@ -500,10 +486,10 @@ public class McpProxyService {
      * List all prompts from all enabled servers (for MCP protocol endpoint).
      */
     public Mono<List<Map<String, Object>>> listAllPrompts(String user) {
-        Map<String, McpServerConfig.McpServerEntry> servers = mcpServerConfig.getAllServers();
+        Map<String, McpServer> servers = mcpServerConfig.getAllServers();
         
         List<Mono<List<Map<String, Object>>>> promptMonos = servers.entrySet().stream()
-                .filter(entry -> entry.getValue().enabled())
+                .filter(entry -> entry.getValue().isEnabled())
                 .map(entry -> {
                     String serverName = entry.getKey();
                     return listPrompts(serverName, user)

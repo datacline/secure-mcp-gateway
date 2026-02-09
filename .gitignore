@@ -163,3 +163,4 @@ logs/
 tmp/
 temp/
 *.tmp
+.env.docker

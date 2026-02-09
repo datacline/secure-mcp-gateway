@@ -29,6 +29,7 @@ public class GatewayConfig {
     // MCP settings
     private String mcpServersConfig = "mcp_servers.yaml";
     private int proxyTimeout = 60;
+    private String policyEngineUrl = "http://localhost:9000";
 
     // Nested configurations
     @NestedConfigurationProperty
@@ -124,6 +125,14 @@ public class GatewayConfig {
 
     public void setProxyTimeout(int proxyTimeout) {
         this.proxyTimeout = proxyTimeout;
+    }
+
+    public String getPolicyEngineUrl() {
+        return policyEngineUrl;
+    }
+
+    public void setPolicyEngineUrl(String policyEngineUrl) {
+        this.policyEngineUrl = policyEngineUrl;
     }
 
     public McpAuthConfig getMcpAuth() {
