@@ -106,8 +106,32 @@ export async function searchCatalog(
 ): Promise<CatalogSearchResponse> {
   const response = await catalogApi.get<CatalogSearchResponse>('/search', {
     params: { q: query, limit, offset },
+    validateStatus: (status) => status === 200 || status === 204, // Accept both 200 and 204
   });
-  return response.data;
+
+  // Handle 204 No Content - no results found
+  if (response.status === 204 || !response.data) {
+    return {
+      servers: [],
+      total_count: 0,
+      returned_count: 0,
+      query: query,
+      limit: limit,
+      offset: offset,
+      page: Math.floor(offset / limit) + 1,
+      total_pages: 0,
+      has_more: false,
+      cache_status: 'ready',
+    };
+  }
+
+  // Normalize servers array (backend may return null for empty results)
+  const data = response.data;
+  if (!Array.isArray(data.servers)) {
+    data.servers = [];
+  }
+
+  return data;
 }
 
 /**

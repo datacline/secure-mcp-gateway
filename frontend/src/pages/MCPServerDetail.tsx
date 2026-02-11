@@ -26,7 +26,9 @@ export default function MCPServerDetail() {
   const [policiesLoading, setPoliciesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [connectionStatus, setConnectionStatus] = useState<'not_tested' | 'connected' | 'failed'>('not_tested');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
   // Get initial tab from URL query param or default to 'permissions'
   const initialTab = (searchParams.get('tab') as 'overview' | 'configure' | 'security' | 'permissions') || 'permissions';
   const [activeTab, setActiveTab] = useState<'overview' | 'configure' | 'security' | 'permissions'>(initialTab);
@@ -45,6 +47,35 @@ export default function MCPServerDetail() {
       loadPolicies();
     }
   }, [serverName, activeTab, loading]);
+
+  // Load tools lazily when overview tab is active and connection not already failed
+  useEffect(() => {
+    if (serverName && activeTab === 'overview' && !loading && tools.length === 0 && connectionStatus !== 'failed') {
+      loadTools();
+    }
+  }, [serverName, activeTab, loading, connectionStatus]);
+
+  const loadTools = async () => {
+    // Only load tools if server is enabled
+    if (server && !server.enabled) {
+      setConnectionStatus('not_tested');
+      setConnectionError('Server is disabled');
+      return;
+    }
+
+    try {
+      // Attempt to list tools - this also tests the connection
+      const toolsResponse = await mcpServerApi.getTools(serverName!);
+      setTools(toolsResponse.tools);
+      setConnectionStatus('connected');
+      setConnectionError(null);
+    } catch (err) {
+      console.warn('Failed to connect to MCP server:', err);
+      setConnectionStatus('failed');
+      setConnectionError(err instanceof Error ? err.message : 'Failed to connect to server');
+      setTools([]);
+    }
+  };
 
   const loadServerDetails = async () => {
     try {
@@ -90,14 +121,8 @@ export default function MCPServerDetail() {
         setServer(foundServer);
       }
 
-      // Load tools for this server
-      try {
-        const toolsResponse = await mcpServerApi.getTools(serverName!);
-        setTools(toolsResponse.tools);
-      } catch (err) {
-        console.warn('Failed to load tools:', err);
-        setTools([]);
-      }
+      // Tools are loaded lazily when needed (e.g., in NewAccessRuleDialog when user selects specific tools)
+      // No need to load them proactively here to improve performance
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load server details');
     } finally {
@@ -453,16 +478,41 @@ export default function MCPServerDetail() {
 
             <div className="info-card">
               <h3>Available Tools</h3>
-              <p className="info-value">{tools.length} tools</p>
-              {tools.length > 0 && (
-                <ul className="tools-list">
-                  {tools.slice(0, 5).map((tool) => (
-                    <li key={tool.name}>{tool.name}</li>
-                  ))}
-                  {tools.length > 5 && (
-                    <li className="more">+ {tools.length - 5} more</li>
+              {connectionStatus === 'not_tested' && (
+                <p className="info-value text-muted">Connection not tested yet</p>
+              )}
+              {connectionStatus === 'failed' && (
+                <div className="connection-error">
+                  <XCircle size={16} className="error-icon" />
+                  <p className="error-message">Connection failed: {connectionError}</p>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setConnectionStatus('not_tested');
+                      loadTools();
+                    }}
+                  >
+                    Retry Connection
+                  </button>
+                </div>
+              )}
+              {connectionStatus === 'connected' && (
+                <>
+                  <p className="info-value">
+                    <CheckCircle size={14} className="success-icon" style={{ marginRight: '4px' }} />
+                    {tools.length} tools
+                  </p>
+                  {tools.length > 0 && (
+                    <ul className="tools-list">
+                      {tools.slice(0, 5).map((tool) => (
+                        <li key={tool.name}>{tool.name}</li>
+                      ))}
+                      {tools.length > 5 && (
+                        <li className="more">+ {tools.length - 5} more</li>
+                      )}
+                    </ul>
                   )}
-                </ul>
+                </>
               )}
             </div>
 

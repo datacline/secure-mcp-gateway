@@ -5,6 +5,7 @@ import com.datacline.mcpgateway.config.McpServerConfig;
 import com.datacline.mcpgateway.service.McpConfigService;
 import com.datacline.mcpgateway.service.McpProxyService;
 import com.datacline.mcpgateway.service.PolicyEngineClient;
+import com.datacline.mcpgateway.service.StdioToHttpConversionService;
 import com.datacline.mcpgateway.service.auth.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,9 @@ public class McpController {
 
     @Autowired
     PolicyEngineClient policyEngineClient;
+
+    @Autowired
+    StdioToHttpConversionService stdioToHttpConversionService;
 
     /**
      * List tools from an MCP server.
@@ -413,6 +417,26 @@ public class McpController {
             LOG.error("Failed to delete server {}", serverName, e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Failed to delete server: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Convert a STDIO MCP server to HTTP.
+     * This spawns an mcp-proxy process (or uses external proxy service) to wrap the stdio server.
+     */
+    @PostMapping("/servers/{serverName}/convert")
+    public ResponseEntity<Map<String, Object>> convertStdioToHttp(@PathVariable String serverName) {
+        try {
+            Map<String, Object> result = stdioToHttpConversionService.convert(serverName);
+            return ResponseEntity.ok(result);
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            LOG.warn("Failed to convert server {}: {}", serverName, e.getReason());
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(Map.of("error", e.getReason()));
+        } catch (Exception e) {
+            LOG.error("Failed to convert server {} to HTTP", serverName, e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to convert server: " + e.getMessage()));
         }
     }
 

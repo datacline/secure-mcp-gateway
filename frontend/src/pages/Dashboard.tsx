@@ -1,73 +1,63 @@
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Shield, CheckCircle, XCircle, Activity, Plus } from 'lucide-react';
-import { unifiedPolicyApi, healthCheck } from '../services/api';
+import { Shield, Server, FileText, Activity, Plus, ExternalLink } from 'lucide-react';
+import { unifiedPolicyApi, javaGatewayMcpApi, healthCheck } from '../services/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import './Dashboard.css';
 
 export default function Dashboard() {
-  const { data: policiesData, isLoading } = useQuery(
-    'unified-policies',
-    () => unifiedPolicyApi.list()
-  );
+  const { data: policiesData, isLoading: policiesLoading } = useQuery({
+    queryKey: ['unified-policies'],
+    queryFn: () => unifiedPolicyApi.list(),
+  });
 
-  const { data: health } = useQuery('health', healthCheck, {
+  const { data: serversData, isLoading: serversLoading } = useQuery({
+    queryKey: ['mcp-servers'],
+    queryFn: () => javaGatewayMcpApi.listServers(),
+  });
+
+  const { data: health } = useQuery({
+    queryKey: ['health'],
+    queryFn: healthCheck,
     refetchInterval: 30000,
   });
 
   const policies = policiesData?.policies || [];
-  const activeCount = policies.filter((p) => p.status === 'active').length;
-  const inactiveCount = policies.filter((p) => p.status !== 'active').length;
-  const denyCount = policies.filter((p) => {
-    if (!p.policy_rules || !Array.isArray(p.policy_rules)) return false;
-    return p.policy_rules.some((rule: any) => 
-      rule.actions?.some((a: any) => a.type === 'deny' || a.type === 'block')
-    );
-  }).length;
+  const servers = serversData?.servers || [];
+
+  const activePoliciesCount = policies.filter((p) => p.status === 'active').length;
+  const activeServersCount = servers.filter((s) => s.enabled).length;
+
+  // For now, we don't have audit logs endpoint, so we'll show 0
+  // TODO: Add audit logs API and fetch data
+  const auditLogsCount = 0;
 
   const stats = [
     {
-      label: 'Total Policies',
-      value: policies.length,
-      icon: Shield,
+      label: 'Active MCP Servers',
+      value: activeServersCount,
+      total: servers.length,
+      icon: Server,
       color: 'primary',
+      link: '/mcp-servers',
     },
     {
-      label: 'Active',
-      value: activeCount,
-      icon: CheckCircle,
+      label: 'Active Policies',
+      value: activePoliciesCount,
+      total: policies.length,
+      icon: Shield,
       color: 'success',
+      link: '/policies',
     },
     {
-      label: 'Inactive',
-      value: inactiveCount,
-      icon: XCircle,
+      label: 'Audit Logs',
+      value: auditLogsCount,
+      icon: FileText,
       color: 'secondary',
-    },
-    {
-      label: 'Deny Policies',
-      value: denyCount,
-      icon: Activity,
-      color: 'warning',
+      link: '/audit-logs',
     },
   ];
-
-  const getRulesCount = (policy: any): number => {
-    if (!policy.policy_rules || !Array.isArray(policy.policy_rules)) return 0;
-    return policy.policy_rules.length;
-  };
-
-  const getActionType = (policy: any): string => {
-    if (!policy.policy_rules || !Array.isArray(policy.policy_rules) || policy.policy_rules.length === 0) {
-      return 'none';
-    }
-    const firstRule = policy.policy_rules[0];
-    if (firstRule.actions && firstRule.actions.length > 0) {
-      return firstRule.actions[0].type || 'unknown';
-    }
-    return 'none';
-  };
 
   return (
     <div className="dashboard">
@@ -75,12 +65,9 @@ export default function Dashboard() {
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="page-description">
-            Overview of your policy management system
+            Overview of your MCP Gateway and policy management system
           </p>
         </div>
-        <Link to="/policies/new">
-          <Button icon={<Plus size={16} />}>Create Policy</Button>
-        </Link>
       </div>
 
       {/* Service Status */}
@@ -102,21 +89,93 @@ export default function Dashboard() {
       {/* Statistics */}
       <div className="stats-grid">
         {stats.map((stat) => (
-          <Card key={stat.label} className="stat-card">
-            <div className="stat-content">
-              <div className={`stat-icon stat-icon-${stat.color}`}>
-                <stat.icon size={24} />
+          <Link key={stat.label} to={stat.link} className="stat-card-link">
+            <Card className="stat-card">
+              <div className="stat-content">
+                <div className={`stat-icon stat-icon-${stat.color}`}>
+                  <stat.icon size={24} />
+                </div>
+                <div className="stat-info">
+                  <p className="stat-label">{stat.label}</p>
+                  <p className="stat-value">
+                    {serversLoading || policiesLoading ? '...' : stat.value}
+                    {stat.total !== undefined && (
+                      <span className="stat-total"> / {stat.total}</span>
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="stat-info">
-                <p className="stat-label">{stat.label}</p>
-                <p className="stat-value">
-                  {isLoading ? '...' : stat.value}
-                </p>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </Link>
         ))}
       </div>
+
+      {/* Recent MCP Servers */}
+      <Card
+        title="Recent MCP Servers"
+        description="Latest configured MCP servers"
+        actions={
+          <Link to="/mcp-servers">
+            <Button variant="outline" size="sm">
+              View All
+            </Button>
+          </Link>
+        }
+      >
+        {serversLoading ? (
+          <p className="text-center">Loading servers...</p>
+        ) : servers.length === 0 ? (
+          <div className="empty-state">
+            <Server size={48} className="empty-icon" />
+            <p className="empty-title">No MCP servers yet</p>
+            <p className="empty-description">
+              Add your first MCP server from the catalog to get started
+            </p>
+            <Link to="/mcp-catalog">
+              <Button icon={<Plus size={16} />}>Browse Catalog</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="servers-list-compact">
+            {servers.slice(0, 5).map((server) => (
+              <Link
+                key={server.name}
+                to={`/mcp-servers/${server.name}`}
+                className="server-item-compact"
+              >
+                <div className="server-item-main">
+                  <div className="server-item-icon">
+                    <Server size={16} />
+                  </div>
+                  <div className="server-item-info">
+                    <h4 className="server-item-name">{server.name}</h4>
+                    {server.description && (
+                      <p className="server-item-description">
+                        {server.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="server-item-meta">
+                  <span
+                    className={`badge badge-${server.enabled ? 'success' : 'secondary'}`}
+                  >
+                    {server.enabled ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="badge badge-outline">
+                    {server.type || 'http'}
+                  </span>
+                  {server.policy_count !== undefined && server.policy_count > 0 && (
+                    <span className="text-xs text-secondary">
+                      {server.policy_count} {server.policy_count === 1 ? 'policy' : 'policies'}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Recent Policies */}
       <Card
@@ -130,7 +189,7 @@ export default function Dashboard() {
           </Link>
         }
       >
-        {isLoading ? (
+        {policiesLoading ? (
           <p className="text-center">Loading policies...</p>
         ) : policies.length === 0 ? (
           <div className="empty-state">
@@ -170,17 +229,37 @@ export default function Dashboard() {
                   >
                     {policy.status === 'active' ? 'Active' : policy.status}
                   </span>
-                  <span className="badge badge-outline">
-                    {getActionType(policy)}
-                  </span>
+                  {policy.policy_rules && policy.policy_rules.length > 0 && (
+                    <span className="badge badge-outline">
+                      {policy.policy_rules[0].actions?.[0]?.type || 'unknown'}
+                    </span>
+                  )}
                   <span className="text-xs text-secondary">
-                    {getRulesCount(policy)} rule{getRulesCount(policy) !== 1 ? 's' : ''}
+                    {policy.policy_rules?.length || 0} {policy.policy_rules?.length === 1 ? 'rule' : 'rules'}
                   </span>
                 </div>
               </Link>
             ))}
           </div>
         )}
+      </Card>
+
+      {/* Quick Links */}
+      <Card title="Quick Actions">
+        <div className="quick-actions">
+          <Link to="/mcp-catalog" className="quick-action">
+            <ExternalLink size={20} />
+            <span>Browse MCP Catalog</span>
+          </Link>
+          <Link to="/policies/new" className="quick-action">
+            <Plus size={20} />
+            <span>Create New Policy</span>
+          </Link>
+          <Link to="/mcp-servers" className="quick-action">
+            <Activity size={20} />
+            <span>Manage MCP Servers</span>
+          </Link>
+        </div>
       </Card>
     </div>
   );

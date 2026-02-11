@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import UnifiedPolicyForm from '../components/UnifiedPolicyForm';
 import { unifiedPolicyApi } from '../services/api';
@@ -11,9 +11,10 @@ export default function PolicyCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const createMutation = useMutation(unifiedPolicyApi.create, {
+  const createMutation = useMutation({
+    mutationFn: unifiedPolicyApi.create,
     onSuccess: (data) => {
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
       navigate(`/policies/${data.policy_id}`);
     },
     onError: (error: Error) => {
@@ -49,7 +50,7 @@ export default function PolicyCreate() {
       <UnifiedPolicyForm
         onSubmit={handleSubmit}
         submitLabel="Create Policy"
-        isLoading={createMutation.isLoading}
+        isLoading={createMutation.isPending}
       />
     </div>
   );

@@ -2,6 +2,7 @@ package com.datacline.mcpgateway.service;
 
 import com.datacline.mcpgateway.config.McpAuthConfig;
 import com.datacline.mcpgateway.config.McpServer;
+import com.datacline.mcpgateway.config.McpServerConfig;
 import com.datacline.mcpgateway.entity.McpServerEntity;
 import com.datacline.mcpgateway.repository.McpServerRepository;
 import org.slf4j.Logger;
@@ -28,14 +29,17 @@ public class McpConfigMigrationService {
     private static final Logger LOG = LoggerFactory.getLogger(McpConfigMigrationService.class);
 
     private final McpServerRepository repository;
+    private final McpServerConfig mcpServerConfig;
     private final String yamlConfigPath;
     private final boolean migrationEnabled;
 
     public McpConfigMigrationService(
             McpServerRepository repository,
+            McpServerConfig mcpServerConfig,
             @Value("${gateway.mcp-servers-config:mcp_servers.yaml}") String yamlConfigPath,
             @Value("${gateway.migrate-yaml-to-db:true}") boolean migrationEnabled) {
         this.repository = repository;
+        this.mcpServerConfig = mcpServerConfig;
         this.yamlConfigPath = yamlConfigPath;
         this.migrationEnabled = migrationEnabled;
     }
@@ -94,6 +98,12 @@ public class McpConfigMigrationService {
             }
 
             LOG.info("Successfully migrated {} MCP server configurations from YAML to PostgreSQL", migrated);
+
+            // Reload the cache to make migrated servers available
+            if (migrated > 0) {
+                LOG.info("Reloading MCP server cache after migration");
+                mcpServerConfig.loadConfig();
+            }
 
         } catch (FileNotFoundException e) {
             LOG.info("No YAML config file found at {}, starting with empty database", yamlConfigPath);

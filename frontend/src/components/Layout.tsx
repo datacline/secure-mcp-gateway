@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Shield, List, Plus, Activity, Server, Library } from 'lucide-react';
 import './Layout.css';
@@ -30,19 +30,19 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
-            to="/mcp-servers"
-            className={`nav-item ${isActive('/mcp-servers') ? 'active' : ''}`}
-          >
-            <Server size={20} />
-            <span>MCP Servers</span>
-          </Link>
-
-          <Link
             to="/mcp-catalog"
             className={`nav-item ${isActive('/mcp-catalog') ? 'active' : ''}`}
           >
             <Library size={20} />
             <span>MCP Catalog</span>
+          </Link>
+
+          <Link
+            to="/mcp-servers"
+            className={`nav-item ${isActive('/mcp-servers') ? 'active' : ''}`}
+          >
+            <Server size={20} />
+            <span>Available MCPs</span>
           </Link>
 
           <Link

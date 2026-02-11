@@ -130,10 +130,21 @@ public class McpServerConfig {
 
     /**
      * Invalidate cache for a specific server (called after updates).
+     * Reloads the server from database if it still exists, or removes it if deleted.
      */
     public void invalidateCache(String serverName) {
-        servers.remove(serverName);
-        LOG.debug("Invalidated cache for server: {}", serverName);
+        // Try to reload the server from database
+        Optional<McpServerEntity> entity = repository.findByName(serverName);
+        if (entity.isPresent()) {
+            // Server exists, reload it into cache
+            McpServer server = entity.get().toMcpServer();
+            servers.put(serverName, server);
+            LOG.debug("Reloaded server into cache: {}", serverName);
+        } else {
+            // Server was deleted, remove from cache
+            servers.remove(serverName);
+            LOG.debug("Removed deleted server from cache: {}", serverName);
+        }
     }
 
     /**

@@ -42,8 +42,8 @@ export default function MCPCatalog() {
   useEffect(() => {
     loadCategories();
     loadExistingServers();
-    // Initial load with empty query to get all items
-    performSearch('', 0);
+    // Initial load with empty query to get all items (page 1, not 0)
+    performSearch('', 1);
   }, []);
 
   const loadCategories = async () => {
@@ -73,16 +73,28 @@ export default function MCPCatalog() {
 
     try {
       const response = await searchCatalog(query, PAGE_SIZE, offset);
-      setCatalogItems(response.servers);
-      setTotalCount(response.total_count);
-      setTotalPages(response.total_pages);
-      setCurrentPage(response.page);
-      setCacheStatus(response.cache_status);
+
+      // Normalize servers to always be an array (backend may return null)
+      const servers = Array.isArray(response.servers) ? response.servers : [];
+
+      // Log response for debugging
+      console.log('Search response:', {
+        query,
+        totalCount: response.total_count,
+        returnedCount: response.returned_count,
+        serversLength: servers.length,
+      });
+
+      setCatalogItems(servers);
+      setTotalCount(response.total_count || 0);
+      setTotalPages(response.total_pages || 0);
+      setCurrentPage(response.page || 1);
+      setCacheStatus(response.cache_status || 'ready');
       setApiConfigured(true);
     } catch (err: any) {
       console.error('Failed to search catalog:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to search catalog';
-      
+
       if (errorMessage.includes('API key not configured')) {
         setApiConfigured(false);
         setError('Postman API key not configured. Please set POSTMAN_API_KEY in the policy engine.');
@@ -92,6 +104,7 @@ export default function MCPCatalog() {
       setCatalogItems([]);
       setTotalCount(0);
       setTotalPages(0);
+      setCurrentPage(1);
     } finally {
       setLoading(false);
     }
@@ -443,6 +456,19 @@ export default function MCPCatalog() {
             <RefreshCw size={32} className="spinning" />
             <p>Loading MCP Catalog...</p>
           </div>
+        ) : error && filteredItems.length === 0 ? (
+          <div className="empty-state">
+            <AlertCircle size={48} />
+            <h3>Search Error</h3>
+            <p>{error}</p>
+            <button
+              className="btn-refresh"
+              onClick={() => performSearch(activeSearch || '', currentPage)}
+              style={{ marginTop: '1rem' }}
+            >
+              Try Again
+            </button>
+          </div>
         ) : filteredItems.length === 0 ? (
           <div className="empty-state">
             {!apiConfigured ? (
@@ -457,11 +483,24 @@ export default function MCPCatalog() {
                 <h3>Loading Catalog</h3>
                 <p>The MCP catalog is being loaded. Please wait a moment...</p>
               </>
+            ) : activeSearch || serverTypeFilter !== 'all' ? (
+              <>
+                <Search size={48} />
+                <h3>No MCP server found</h3>
+                <p>
+                  {activeSearch && serverTypeFilter !== 'all'
+                    ? `No ${serverTypeFilter.toUpperCase()} servers found for "${activeSearch}"`
+                    : activeSearch
+                      ? `No MCP server found for "${activeSearch}"`
+                      : `No ${serverTypeFilter.toUpperCase()} servers available`
+                  }
+                </p>
+              </>
             ) : (
               <>
                 <Search size={48} />
-                <h3>No results found</h3>
-                <p>Try a different search term or browse all servers.</p>
+                <h3>No servers available</h3>
+                <p>The MCP catalog is empty.</p>
               </>
             )}
           </div>

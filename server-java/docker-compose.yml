@@ -53,6 +53,28 @@ services:
     networks:
       - mcp-network
 
+  # STDIO Proxy Service (converts STDIO MCP servers to HTTP)
+  stdio-proxy-service:
+    build:
+      context: ../stdio-proxy-service
+      dockerfile: Dockerfile
+    container_name: stdio-proxy-service
+    ports:
+      - "8081:8080"
+    environment:
+      PORT: 8080
+      HOST: 0.0.0.0
+      EXTERNAL_HOST: stdio-proxy-service
+      BASE_PORT: 9000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mcp-network
+
   # MCP Gateway (Java/Spring Boot)
   mcp-gateway-java:
     build:
@@ -86,6 +108,10 @@ services:
       MCP_SERVERS_CONFIG: /app/mcp_servers.yaml
       PROXY_TIMEOUT: 60
 
+      # STDIO Proxy Service Configuration
+      GATEWAY_STDIO_PROXY_EXTERNAL: 'true'
+      GATEWAY_STDIO_PROXY_SERVICE_URL: http://stdio-proxy-service:8080
+
       # Audit Logging
       AUDIT_LOG_FILE: /app/logs/audit.json
       AUDIT_TO_STDOUT: 'true'
@@ -105,6 +131,8 @@ services:
       - gateway_data:/app/data
     depends_on:
       postgres:
+        condition: service_healthy
+      stdio-proxy-service:
         condition: service_healthy
       #keycloak:
         #condition: service_healthy

@@ -229,9 +229,10 @@ type UnifiedPolicyListFilter struct {
 	ResourceID   string        `json:"resource_id,omitempty"`
 }
 
-// IsGlobal returns true if the policy has no scope restrictions (applies to all)
+// IsGlobal returns true if the policy has no resource restrictions (applies to all resources)
+// Note: Scopes determine WHO the policy applies to, Resources determine WHAT it applies to
 func (p *UnifiedPolicy) IsGlobal() bool {
-	return len(p.Scopes) == 0
+	return len(p.Resources) == 0
 }
 
 // IsActive returns true if the policy is currently active and within effective period

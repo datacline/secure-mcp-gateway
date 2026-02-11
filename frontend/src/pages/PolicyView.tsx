@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Edit,
@@ -32,7 +32,7 @@ import { format } from 'date-fns';
 import './PolicyView.css';
 
 export default function PolicyView() {
-  const { id } = useParams<{ id: string }>();
+  const { policyId } = useParams<{ policyId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -46,37 +46,40 @@ export default function PolicyView() {
     });
   }, []);
 
-  const { data: policy, isLoading } = useQuery(
-    ['unified-policy', id],
-    () => unifiedPolicyApi.get(id!),
-    { enabled: !!id }
-  );
+  const { data: policy, isLoading } = useQuery({
+    queryKey: ['unified-policy', policyId],
+    queryFn: () => unifiedPolicyApi.get(policyId!),
+    enabled: !!policyId,
+  });
 
-  const deleteMutation = useMutation(unifiedPolicyApi.delete, {
+  const deleteMutation = useMutation({
+    mutationFn: unifiedPolicyApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
       navigate('/policies');
     },
   });
 
-  const activateMutation = useMutation(unifiedPolicyApi.activate, {
+  const activateMutation = useMutation({
+    mutationFn: unifiedPolicyApi.activate,
     onSuccess: () => {
-      queryClient.invalidateQueries(['unified-policy', id]);
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policy', policyId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
     },
   });
 
-  const suspendMutation = useMutation(unifiedPolicyApi.suspend, {
+  const suspendMutation = useMutation({
+    mutationFn: unifiedPolicyApi.suspend,
     onSuccess: () => {
-      queryClient.invalidateQueries(['unified-policy', id]);
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policy', policyId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
     },
   });
 
   const handleDelete = async () => {
     if (window.confirm(`Are you sure you want to delete "${policy?.name}"?`)) {
       try {
-        await deleteMutation.mutateAsync(id!);
+        await deleteMutation.mutateAsync(policyId!);
       } catch (error) {
         alert(`Failed to delete policy: ${error}`);
       }
@@ -86,9 +89,9 @@ export default function PolicyView() {
   const handleToggle = async () => {
     try {
       if (policy?.status === 'active') {
-        await suspendMutation.mutateAsync(id!);
+        await suspendMutation.mutateAsync(policyId!);
       } else {
-        await activateMutation.mutateAsync(id!);
+        await activateMutation.mutateAsync(policyId!);
       }
     } catch (error) {
       alert(`Failed to toggle policy: ${error}`);
@@ -156,11 +159,11 @@ export default function PolicyView() {
               variant="outline"
               icon={isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
               onClick={handleToggle}
-              loading={activateMutation.isLoading || suspendMutation.isLoading}
+              loading={activateMutation.isPending || suspendMutation.isPending}
             >
               {isActive ? 'Disable' : 'Enable'}
             </Button>
-            <Link to={`/policies/${id}/edit`}>
+            <Link to={`/policies/${policyId}/edit`}>
               <Button variant="secondary" icon={<Edit size={16} />}>
                 Edit
               </Button>
@@ -169,7 +172,7 @@ export default function PolicyView() {
               variant="danger"
               icon={<Trash2 size={16} />}
               onClick={handleDelete}
-              loading={deleteMutation.isLoading}
+              loading={deleteMutation.isPending}
             >
               Delete
             </Button>
@@ -340,7 +343,7 @@ export default function PolicyView() {
               } else if (scope.principal_type === 'organization') {
                 const group = getGroupById(scope.principal_id);
                 if (group) {
-                  principalDetails = { name: group.name, subtitle: `${group.memberCount} members` };
+                  principalDetails = { name: group.name, subtitle: `${group.member_count} members` };
                 }
                 icon = <Users size={16} />;
               }

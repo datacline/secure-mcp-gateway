@@ -294,6 +294,12 @@ export const javaGatewayMcpApi = {
     await javaGatewayApi.post('/mcp/servers/reload');
   },
 
+  // Convert STDIO server to HTTP
+  convertStdioToHttp: async (serverName: string): Promise<{ name: string; type: string; url: string; status: string; proxy_port: number }> => {
+    const response = await javaGatewayApi.post(`/mcp/servers/${serverName}/convert`);
+    return response.data;
+  },
+
   // List all servers with policies (include_policies=true)
   listServersWithPolicies: async (): Promise<MCPServersResponse> => {
     const response = await javaGatewayApi.get<MCPServersResponse>('/mcp/servers', {

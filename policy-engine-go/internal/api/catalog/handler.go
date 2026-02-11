@@ -519,7 +519,8 @@ func (h *Handler) SearchCatalog(c *gin.Context) {
 	}
 
 	// Filter servers based on query
-	var filtered []TransformedMCPServer
+	// Initialize as empty slice to ensure JSON marshals as [] not null
+	filtered := make([]TransformedMCPServer, 0)
 	if query == "" {
 		filtered = allServers
 	} else {

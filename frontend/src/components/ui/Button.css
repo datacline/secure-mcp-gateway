@@ -43,16 +43,18 @@
 }
 
 .btn-secondary {
-  background: var(--secondary);
-  color: white;
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #475569;
+  background: var(--bg-card);
+  border-color: var(--border-hover);
 }
 
 .btn-danger {
-  background: var(--danger);
+  background: #ef4444;
   color: white;
 }
 
@@ -61,12 +63,12 @@
 }
 
 .btn-success {
-  background: var(--success);
-  color: white;
+  background: var(--primary);
+  color: #000000;
 }
 
 .btn-success:hover:not(:disabled) {
-  background: #059669;
+  background: var(--primary-dark);
 }
 
 .btn-outline {
@@ -76,7 +78,8 @@
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: var(--bg);
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 /* Loading state */
