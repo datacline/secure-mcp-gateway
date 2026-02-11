@@ -1,0 +1,23 @@
+policy_id: 1e8f2522-7d16-45ca-8e9b-a5320a8e3530
+policy_code: test-policy-002
+policy_rules:
+    - rule_id: test-rule-2
+      priority: 0
+      description: Test rule
+      conditions:
+        field: tool.name
+        operator: equals
+        value: test-tool
+      actions:
+        - type: allow
+version: 1
+status: active
+priority: 0
+created_at: 2026-02-10T13:33:07.108694+01:00
+updated_at: 2026-02-10T13:33:07.108694+01:00
+name: Test Policy 2
+description: Testing for duplicates
+resources:
+    - policy_id: 1e8f2522-7d16-45ca-8e9b-a5320a8e3530
+      resource_type: mcp_server
+      resource_id: test-server

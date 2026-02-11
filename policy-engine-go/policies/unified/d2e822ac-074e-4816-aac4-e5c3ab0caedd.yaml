@@ -1,0 +1,27 @@
+policy_id: d2e822ac-074e-4816-aac4-e5c3ab0caedd
+policy_code: google-maps-mcp-server-npm-policy-mlgy58w4
+policy_rules:
+    - rule_id: rule-mlgy58w4-e6dbb4
+      priority: 0
+      description: Allow access to 1 selected tool(s)
+      conditions:
+        field: tool.name
+        operator: in
+        value:
+            - maps_search_places
+      actions:
+        - type: allow
+version: 1
+status: active
+priority: 0
+created_at: 2026-02-10T19:40:49.744037+01:00
+updated_at: 2026-02-10T19:40:49.744037+01:00
+name: google-maps-mcp-server-npm Access Policy
+description: Access policy for google-maps-mcp-server-npm MCP server
+resources:
+    - policy_id: d2e822ac-074e-4816-aac4-e5c3ab0caedd
+      resource_type: mcp_server
+      resource_id: google-maps-mcp-server-npm
+    - policy_id: d2e822ac-074e-4816-aac4-e5c3ab0caedd
+      resource_type: tool
+      resource_id: google-maps-mcp-server-npm:maps_search_places

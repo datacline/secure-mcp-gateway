@@ -359,3 +359,41 @@
     width: 100%;
   }
 }
+
+/* STDIO Server Environment Variables Display */
+.env-vars-display {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.env-var-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.env-var-key {
+  color: var(--primary);
+  background: var(--bg-hover);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+.env-var-value {
+  color: var(--text);
+  background: var(--bg-hover);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

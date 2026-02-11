@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import UnifiedPolicyForm from '../components/UnifiedPolicyForm';
 import { unifiedPolicyApi } from '../services/api';
@@ -8,29 +8,27 @@ import Button from '../components/ui/Button';
 import './PolicyEdit.css';
 
 export default function PolicyEdit() {
-  const { id } = useParams<{ id: string }>();
+  const { policyId } = useParams<{ policyId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: policy, isLoading } = useQuery(
-    ['unified-policy', id],
-    () => unifiedPolicyApi.get(id!),
-    { enabled: !!id }
-  );
+  const { data: policy, isLoading } = useQuery({
+    queryKey: ['unified-policy', policyId],
+    queryFn: () => unifiedPolicyApi.get(policyId!),
+    enabled: !!policyId,
+  });
 
-  const updateMutation = useMutation(
-    (data: UnifiedPolicyCreateRequest) => unifiedPolicyApi.update(id!, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('unified-policies');
-        queryClient.invalidateQueries(['unified-policy', id]);
-        navigate(`/policies/${id}`);
-      },
-      onError: (error: Error) => {
-        alert(`Failed to update policy: ${error.message}`);
-      },
-    }
-  );
+  const updateMutation = useMutation({
+    mutationFn: (data: UnifiedPolicyCreateRequest) => unifiedPolicyApi.update(policyId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-policy', policyId] });
+      navigate(`/policies/${policyId}`);
+    },
+    onError: (error: Error) => {
+      alert(`Failed to update policy: ${error.message}`);
+    },
+  });
 
   const handleSubmit = async (data: UnifiedPolicyCreateRequest) => {
     await updateMutation.mutateAsync(data);
@@ -71,7 +69,7 @@ export default function PolicyEdit() {
             variant="outline"
             size="sm"
             icon={<ArrowLeft size={16} />}
-            onClick={() => navigate(`/policies/${id}`)}
+            onClick={() => navigate(`/policies/${policyId}`)}
           >
             Back
           </Button>
@@ -88,7 +86,7 @@ export default function PolicyEdit() {
         initialData={initialData}
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
-        isLoading={updateMutation.isLoading}
+        isLoading={updateMutation.isPending}
       />
     </div>
   );

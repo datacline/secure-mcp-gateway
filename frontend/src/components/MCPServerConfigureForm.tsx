@@ -227,6 +227,80 @@ export default function MCPServerConfigureForm({ server, onSave, onDelete }: MCP
           <p className="form-hint">The URL where the MCP server is hosted</p>
         </div>
 
+        {/* STDIO Server Configuration */}
+        {config.type === 'stdio' && (
+          <>
+            <div className="form-group">
+              <label htmlFor="command" className="form-label">
+                Command
+              </label>
+              <input
+                id="command"
+                type="text"
+                className="form-input"
+                value={config.metadata?.command || ''}
+                onChange={(e) => setConfig({
+                  ...config,
+                  metadata: { ...config.metadata, command: e.target.value }
+                })}
+                placeholder="npx"
+                disabled={!!config.metadata?.source}
+                title={config.metadata?.source ? 'Command is set from catalog and cannot be changed' : ''}
+              />
+              <p className="form-hint">
+                {config.metadata?.source
+                  ? 'Command from catalog (read-only)'
+                  : 'The command to execute for this STDIO server'}
+              </p>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="args" className="form-label">
+                Arguments
+              </label>
+              <input
+                id="args"
+                type="text"
+                className="form-input"
+                value={Array.isArray(config.metadata?.args)
+                  ? config.metadata.args.join(' ')
+                  : (config.metadata?.args || '')}
+                onChange={(e) => {
+                  const argsArray = e.target.value.split(' ').filter(arg => arg.trim());
+                  setConfig({
+                    ...config,
+                    metadata: { ...config.metadata, args: argsArray }
+                  });
+                }}
+                placeholder="-y @modelcontextprotocol/server-example"
+                disabled={!!config.metadata?.source}
+                title={config.metadata?.source ? 'Arguments are set from catalog and cannot be changed' : ''}
+              />
+              <p className="form-hint">
+                {config.metadata?.source
+                  ? 'Arguments from catalog (read-only)'
+                  : 'Space-separated arguments for the command'}
+              </p>
+            </div>
+
+            {config.metadata?.env && Object.keys(config.metadata.env).length > 0 && (
+              <div className="form-group">
+                <label className="form-label">Environment Variables</label>
+                <div className="env-vars-display">
+                  {Object.entries(config.metadata.env).map(([key, value]) => (
+                    <div key={key} className="env-var-item">
+                      <code className="env-var-key">{key}</code>
+                      <span>=</span>
+                      <code className="env-var-value">{typeof value === 'string' ? value : JSON.stringify(value)}</code>
+                    </div>
+                  ))}
+                </div>
+                <p className="form-hint">Environment variables from catalog configuration</p>
+              </div>
+            )}
+          </>
+        )}
+
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="type" className="form-label required">

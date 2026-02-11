@@ -7,34 +7,60 @@
 }
 
 :root {
-  --primary-600: #234eea;
-  --primary-700: #143dd3;
-  --primary-50: #eef2ff;
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  --green-50: #f0fdf4;
-  --green-100: #dcfce7;
-  --green-500: #22c55e;
-  --green-600: #16a34a;
-  --green-700: #15803d;
-  --red-50: #fef2f2;
-  --red-100: #fee2e2;
+  /* Dark Theme - Black background with #A3D78A accent */
+  --bg: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card: #1a1a1a;
+  --bg-hover: #2a2a2a;
+  --text: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border: #2a2a2a;
+  --border-hover: #3a3a3a;
+
+  /* Primary color - #A3D78A accent */
+  --primary: #A3D78A;
+  --primary-dark: #8DC474;
+  --primary-light: #B8E3A3;
+  --primary-50: #f0f9eb;
+  --primary-100: #ddf0cd;
+  --primary-500: #A3D78A;
+  --primary-600: #8DC474;
+  --primary-700: #75b05d;
+
+  --tab-active-bg: #2a2a2a;
+  --tab-active-text: #A3D78A;
+  --tab-active-border: #3a3a3a;
+
+  --gray-50: #1a1a1a;
+  --gray-100: #2a2a2a;
+  --gray-200: #3a3a3a;
+  --gray-300: #4a4a4a;
+  --gray-400: #6b7280;
+  --gray-500: #9ca3af;
+  --gray-600: #cbd5e1;
+  --gray-700: #e5e7eb;
+  --gray-800: #f3f4f6;
+  --gray-900: #f9fafb;
+
+  --green-50: #0f2818;
+  --green-100: #1a4028;
+  --green-500: #A3D78A;
+  --green-600: #8DC474;
+  --green-700: #75b05d;
+
+  --red-50: #2d1515;
+  --red-100: #4a1f1f;
   --red-500: #ef4444;
   --red-600: #dc2626;
-  --blue-50: #eff6ff;
-  --blue-100: #dbeafe;
+
+  --blue-50: #0f1a2d;
+  --blue-100: #1a2f4a;
   --blue-500: #3b82f6;
   --blue-600: #2563eb;
-  --yellow-50: #fefce8;
-  --yellow-100: #fef9c3;
+
+  --yellow-50: #2d2815;
+  --yellow-100: #4a421f;
   --yellow-500: #eab308;
   --yellow-600: #ca8a04;
 }
@@ -45,8 +71,8 @@ body {
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--gray-50);
-  color: var(--gray-900);
+  background-color: var(--bg);
+  color: var(--text);
   min-height: 100vh;
 }
 

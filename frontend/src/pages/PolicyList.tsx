@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Plus,
@@ -23,23 +23,29 @@ export default function PolicyList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
-  const { data, isLoading, refetch } = useQuery('unified-policies', () => unifiedPolicyApi.list());
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['unified-policies'],
+    queryFn: () => unifiedPolicyApi.list(),
+  });
 
-  const deleteMutation = useMutation(unifiedPolicyApi.delete, {
+  const deleteMutation = useMutation({
+    mutationFn: unifiedPolicyApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
     },
   });
 
-  const activateMutation = useMutation(unifiedPolicyApi.activate, {
+  const activateMutation = useMutation({
+    mutationFn: unifiedPolicyApi.activate,
     onSuccess: () => {
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
     },
   });
 
-  const suspendMutation = useMutation(unifiedPolicyApi.suspend, {
+  const suspendMutation = useMutation({
+    mutationFn: unifiedPolicyApi.suspend,
     onSuccess: () => {
-      queryClient.invalidateQueries('unified-policies');
+      queryClient.invalidateQueries({ queryKey: ['unified-policies'] });
     },
   });
 
@@ -264,7 +270,7 @@ export default function PolicyList() {
                         <button
                           className="action-btn action-btn-secondary"
                           onClick={() => handleToggle(policy)}
-                          disabled={activateMutation.isLoading || suspendMutation.isLoading}
+                          disabled={activateMutation.isPending || suspendMutation.isPending}
                           title={policy.status === 'active' ? 'Disable' : 'Enable'}
                         >
                           {policy.status === 'active' ? (
@@ -276,7 +282,7 @@ export default function PolicyList() {
                         <button
                           className="action-btn action-btn-danger"
                           onClick={() => handleDelete(policy)}
-                          disabled={deleteMutation.isLoading}
+                          disabled={deleteMutation.isPending}
                           title="Delete"
                         >
                           <Trash2 size={16} />

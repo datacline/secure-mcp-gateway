@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, User, Users, Shield, Search, Check, Minus, Info, Trash2 } from 'lucide-react';
+import { X, User, Users, Shield, Search, Check, Minus, Info, Trash2, XCircle, CheckCircle } from 'lucide-react';
 import { mcpServerApi, unifiedPolicyApi, type MCPTool } from '../services/api';
 import type { 
   UnifiedPolicyCreateRequest, 
@@ -92,6 +92,8 @@ export default function NewAccessRuleDialog({ serverName, onClose, onCreated }: 
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [toolSearch, setToolSearch] = useState('');
   const [loadingTools, setLoadingTools] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'not_tested' | 'connected' | 'failed'>('not_tested');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Action
   const [action, setAction] = useState<RuleActionType>('allow');
@@ -158,10 +160,16 @@ export default function NewAccessRuleDialog({ serverName, onClose, onCreated }: 
   const loadTools = async () => {
     try {
       setLoadingTools(true);
+      setConnectionError(null);
       const response = await mcpServerApi.getTools(serverName);
       setTools(response.tools || []);
+      setConnectionStatus('connected');
+      setConnectionError(null);
     } catch (err) {
-      console.error('Failed to load tools:', err);
+      console.warn('Failed to connect to MCP server:', err);
+      setConnectionStatus('failed');
+      setConnectionError(err instanceof Error ? err.message : 'Failed to connect to server');
+      setTools([]);
     } finally {
       setLoadingTools(false);
     }
@@ -640,9 +648,33 @@ export default function NewAccessRuleDialog({ serverName, onClose, onCreated }: 
 
                 <div className="tools-list">
                   {loadingTools ? (
-                    <div className="loading-tools">Loading tools...</div>
+                    <div className="loading-tools">Connecting to server and loading tools...</div>
+                  ) : connectionStatus === 'not_tested' ? (
+                    <div className="connection-status">
+                      <Info size={16} />
+                      <span>Tools will be loaded after testing connection</span>
+                    </div>
+                  ) : connectionStatus === 'failed' ? (
+                    <div className="connection-error">
+                      <XCircle size={16} className="error-icon" />
+                      <div className="error-content">
+                        <p className="error-message">Connection failed: {connectionError}</p>
+                        <button
+                          className="btn btn-sm btn-secondary retry-btn"
+                          onClick={() => {
+                            setConnectionStatus('not_tested');
+                            loadTools();
+                          }}
+                        >
+                          Retry Connection
+                        </button>
+                      </div>
+                    </div>
                   ) : filteredTools.length === 0 ? (
-                    <div className="no-tools">No tools found</div>
+                    <div className="no-tools">
+                      <CheckCircle size={16} className="success-icon" />
+                      <span>Connected successfully, but no tools found</span>
+                    </div>
                   ) : (
                     filteredTools.map((tool) => (
                       <label key={tool.name} className="tool-item">

@@ -1,0 +1,42 @@
+policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+policy_code: github-remote-mcp-server-policy-mlgipg6n
+policy_rules:
+    - rule_id: rule-mlgipg6n-jc1ws6
+      priority: 0
+      description: Allow access to 3 selected tool(s)
+      conditions:
+        field: tool.name
+        operator: in
+        value:
+            - add_issue_comment
+            - add_comment_to_pending_review
+            - get_commit
+      actions:
+        - type: allow
+version: 1
+status: active
+priority: 0
+created_at: 2026-02-10T12:28:38.533988+01:00
+updated_at: 2026-02-10T12:28:38.533988+01:00
+name: github-remote-mcp-server Access Policy
+description: Access policy for github-remote-mcp-server MCP server
+resources:
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      resource_type: mcp_server
+      resource_id: github-remote-mcp-server
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      resource_type: tool
+      resource_id: github-remote-mcp-server:add_issue_comment
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      resource_type: tool
+      resource_id: github-remote-mcp-server:add_comment_to_pending_review
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      resource_type: tool
+      resource_id: github-remote-mcp-server:get_commit
+scopes:
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      principal_type: user
+      principal_id: user-009
+    - policy_id: e0cf08be-d3e4-4e06-988e-e4eb5bce9710
+      principal_type: user
+      principal_id: user-010
