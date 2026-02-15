@@ -1,0 +1,47 @@
+policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+policy_code: notion-policy-mlmnvlp0
+policy_rules:
+    - rule_id: rule-mlmnvloz-m6v6gz
+      priority: 0
+      description: Allow access to 6 selected tool(s)
+      conditions:
+        field: tool.name
+        operator: in
+        value:
+            - API-get-self
+            - API-post-search
+            - API-get-block-children
+            - API-patch-block-children
+            - API-retrieve-a-block
+            - API-update-a-block
+      actions:
+        - type: allow
+version: 1
+status: active
+priority: 0
+created_at: 2026-02-14T19:40:00.677949+01:00
+updated_at: 2026-02-14T19:40:00.677949+01:00
+name: notion Access Policy
+description: Access policy for notion MCP server
+resources:
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: mcp_server
+      resource_id: notion
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-get-self
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-post-search
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-get-block-children
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-patch-block-children
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-retrieve-a-block
+    - policy_id: 8dfba946-7c82-462a-b97f-4b610b628ba8
+      resource_type: tool
+      resource_id: notion:API-update-a-block

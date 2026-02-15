@@ -1,0 +1,81 @@
+{
+  "name": "@datacline/secure-mcp-gateway",
+  "version": "1.0.0",
+  "description": "Enterprise-grade security gateway for Model Context Protocol servers with authentication, policy-based access control, tool filtering, and audit logging for AI agents and LLMs",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-gateway",
+    "mcp-server",
+    "mcp-proxy",
+    "ai-gateway",
+    "ai-security",
+    "llm-security",
+    "claude-mcp",
+    "claude-desktop",
+    "ai-agents",
+    "llm-tools",
+    "authentication",
+    "oauth2",
+    "jwt",
+    "keycloak",
+    "policy-engine",
+    "access-control",
+    "rbac",
+    "audit-logging",
+    "compliance",
+    "enterprise-ai",
+    "multi-tenancy",
+    "tool-filtering",
+    "mcp-groups",
+    "stdio-to-http",
+    "spring-boot",
+    "golang",
+    "typescript",
+    "react",
+    "postgresql",
+    "docker",
+    "vscode-mcp",
+    "ai-compliance",
+    "policy-based-access-control",
+    "mcp-authentication",
+    "mcp-server-management",
+    "secure-ai",
+    "ai-tool-governance",
+    "soc2-compliance",
+    "gdpr-compliance"
+  ],
+  "homepage": "https://github.com/datacline/secure-mcp-gateway#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datacline/secure-mcp-gateway.git"
+  },
+  "bugs": {
+    "url": "https://github.com/datacline/secure-mcp-gateway/issues"
+  },
+  "author": "Datacline",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "logs": "docker-compose logs -f",
+    "clean": "docker-compose down -v",
+    "build": "docker-compose build",
+    "test": "echo 'Run service-specific tests'",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:gateway": "cd server-java && ./mvnw spring-boot:run",
+    "dev:policy": "cd policy-engine-go && go run main.go"
+  },
+  "workspaces": [
+    "frontend",
+    "cli"
+  ],
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  }
+}

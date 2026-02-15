@@ -107,6 +107,7 @@ services:
       # MCP Configuration
       MCP_SERVERS_CONFIG: /app/mcp_servers.yaml
       PROXY_TIMEOUT: 60
+      POLICY_ENGINE_URL: http://host.docker.internal:9000
 
       # STDIO Proxy Service Configuration
       GATEWAY_STDIO_PROXY_EXTERNAL: 'true'
