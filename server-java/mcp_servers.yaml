@@ -32,65 +32,6 @@ servers:
       region: "localhost"
       description: "Mock server in Docker environment"
 
-  # GitHub Copilot MCP Server
-  github:
-    type: http
-    url: https://api.githubcopilot.com/mcp
-    timeout: 60
-    enabled: false  # Disabled by default - enable when you have a token
-    description: "GitHub Copilot MCP server"
-    tags: ["github", "copilot", "code"]
-    tools: ["*"]  # Supports various tools
-    auth:
-      method: bearer
-      location: header
-      name: Authorization
-      format: prefix
-      prefix: "Bearer "
-      credential_ref: env://GITHUB_MCP_PAT
-    metadata:
-      cluster: "github"
-      region: "cloud"
-      description: "GitHub Copilot MCP services" 
-
-  figma:
-    url: https://mcp.figma.com/mcp
-    type: http
-    enabled: false
-
-  # Playwright MCP Server (stdio example)
-  # Install: npm install -g @modelcontextprotocol/server-playwright
-  playwright-mcp-server:
-    type: stdio
-    command: npx
-    args:
-      - "@modelcontextprotocol/server-playwright"
-    timeout: 60
-    enabled: false  # Disabled by default - enable after installing
-    description: "Playwright MCP server for browser automation"
-    tags: ["playwright", "browser", "automation", "testing"]
-    tools: ["*"]  # Supports various browser automation tools
-    metadata:
-      cluster: "local"
-      region: "localhost"
-      description: "Browser automation via Playwright"
-      capabilities: ["browser_automation", "screenshot", "pdf_generation", "web_scraping"]
-
-  # Example: Python-based stdio MCP server
-  # python-mcp-server:
-  #   type: stdio
-  #   command: python
-  #   args:
-  #     - "-m"
-  #     - "my_mcp_server"
-  #   env:
-  #     PYTHONPATH: "/path/to/python/modules"
-  #     LOG_LEVEL: "INFO"
-  #   timeout: 30
-  #   enabled: false
-  #   description: "Custom Python MCP server"
-  #   tags: ["python", "custom"]
-
   # Notion MCP Server
   # Note: When running Notion MCP server with --transport http, it generates a bearer token
   # The NOTION_TOKEN env var is the Notion API token (ntn_*) used BY the MCP server

@@ -14,35 +14,6 @@ servers:
     - search_data
     type: mock-mcp
     url: http://localhost:3000/mcp
-  figma:
-    description: ''
-    enabled: false
-    tags: []
-    type: http
-    url: https://mcp.figma.com/mcp
-  github:
-    auth:
-      credential_ref: env://GITHUB_MCP_PAT
-      format: prefix
-      location: header
-      method: bearer
-      name: Authorization
-      prefix: 'Bearer '
-    description: GitHub Copilot MCP server
-    enabled: true
-    metadata:
-      cluster: github
-      description: GitHub Copilot MCP services
-      region: cloud
-    tags:
-    - github
-    - copilot
-    - code
-    timeout: 60
-    tools:
-    - '*'
-    type: http
-    url: https://api.githubcopilot.com/mcp
   mock-server:
     auth: null
     description: Mock MCP server in Docker

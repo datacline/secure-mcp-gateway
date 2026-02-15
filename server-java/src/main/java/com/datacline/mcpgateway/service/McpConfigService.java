@@ -17,15 +17,18 @@ import java.util.*;
 public class McpConfigService {
 
     private static final Logger LOG = LoggerFactory.getLogger(McpConfigService.class);
-    
+
     private final McpServerRepository repository;
     private final com.datacline.mcpgateway.config.McpServerConfig serverConfig;
+    private final PolicyEngineClient policyEngineClient;
 
     public McpConfigService(
             McpServerRepository repository,
-            @org.springframework.context.annotation.Lazy com.datacline.mcpgateway.config.McpServerConfig serverConfig) {
+            @org.springframework.context.annotation.Lazy com.datacline.mcpgateway.config.McpServerConfig serverConfig,
+            PolicyEngineClient policyEngineClient) {
         this.repository = repository;
         this.serverConfig = serverConfig;
+        this.policyEngineClient = policyEngineClient;
         LOG.info("MCP Config Service initialized with PostgreSQL storage");
     }
 
@@ -102,21 +105,43 @@ public class McpConfigService {
     }
 
     /**
-     * Delete a server
+     * Delete a server and its associated policies
      */
     @Transactional
     public void deleteServer(String serverName) {
         McpServerEntity entity = repository.findByName(serverName)
                 .orElseThrow(() -> new IllegalArgumentException("Server not found: " + serverName));
-        
+
+        // Delete the server from database
         repository.delete(entity);
-        
+
         // Invalidate cache
         if (this.serverConfig != null) {
             this.serverConfig.invalidateCache(serverName);
         }
-        
-        LOG.info("Deleted server: {}", serverName);
+
+        LOG.info("Deleted server from database: {}", serverName);
+
+        // Delete associated policies from policy engine (async, non-blocking)
+        try {
+            policyEngineClient.deletePoliciesForMCPServer(serverName)
+                    .subscribe(
+                            deletedCount -> {
+                                if (deletedCount > 0) {
+                                    LOG.info("Deleted {} policies associated with server: {}",
+                                            deletedCount, serverName);
+                                } else {
+                                    LOG.debug("No policies found to delete for server: {}", serverName);
+                                }
+                            },
+                            error -> LOG.error("Failed to delete policies for server {}: {}",
+                                    serverName, error.getMessage())
+                    );
+        } catch (Exception e) {
+            // Don't fail server deletion if policy deletion fails
+            LOG.warn("Error initiating policy deletion for server {}: {}",
+                    serverName, e.getMessage());
+        }
     }
 
     /**
