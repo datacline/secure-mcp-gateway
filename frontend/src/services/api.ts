@@ -264,6 +264,25 @@ export interface MCPServerConfigResponse extends MCPServerConfigRequest {
   policy_error?: string;
 }
 
+export interface MCPServerGroup {
+  id: string;
+  name: string;
+  description?: string;
+  serverNames: string[];
+  server_count?: number;
+  tool_config?: Record<string, string[]>; // Map of server name -> allowed tool names
+  gateway_url?: string;
+  gateway_port?: number;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MCPGroupsResponse {
+  groups: MCPServerGroup[];
+  count: number;
+}
+
 export const javaGatewayMcpApi = {
   // Get server configuration with policies (from Java Gateway)
   getConfig: async (serverName: string): Promise<MCPServerConfigResponse> => {
@@ -335,6 +354,79 @@ export const javaGatewayMcpApi = {
       '/mcp/list-tools',
       { params: { mcp_server: serverName } }
     );
+    return response.data;
+  },
+
+  // Get policy-allowed tools for a specific server (Phase 3)
+  getPolicyAllowedTools: async (serverName: string): Promise<MCPToolsResponse & { policy_filtered: boolean; total_server_tools: number }> => {
+    const response = await javaGatewayApi.get<MCPToolsResponse & { policy_filtered: boolean; total_server_tools: number }>(
+      `/mcp/servers/${serverName}/policy-allowed-tools`
+    );
+    return response.data;
+  },
+
+  // ============================================================================
+  // MCP Server Groups API
+  // ============================================================================
+
+  // List all groups
+  listGroups: async (): Promise<MCPGroupsResponse> => {
+    const response = await javaGatewayApi.get<MCPGroupsResponse>('/mcp/groups');
+    return response.data;
+  },
+
+  // Get a specific group
+  getGroup: async (groupId: string): Promise<MCPServerGroup> => {
+    const response = await javaGatewayApi.get<MCPServerGroup>(`/mcp/groups/${groupId}`);
+    return response.data;
+  },
+
+  // Create a new group
+  createGroup: async (name: string, description: string | undefined, serverNames: string[]): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.post('/mcp/groups', {
+      name,
+      description,
+      serverNames,
+    });
+    return response.data;
+  },
+
+  // Update a group
+  updateGroup: async (groupId: string, updates: Partial<MCPServerGroup>): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.put(`/mcp/groups/${groupId}`, updates);
+    return response.data;
+  },
+
+  // Delete a group
+  deleteGroup: async (groupId: string): Promise<void> => {
+    await javaGatewayApi.delete(`/mcp/groups/${groupId}`);
+  },
+
+  // Add a server to a group
+  addServerToGroup: async (groupId: string, serverName: string): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.post(`/mcp/groups/${groupId}/servers/${serverName}`);
+    return response.data;
+  },
+
+  // Remove a server from a group
+  removeServerFromGroup: async (groupId: string, serverName: string): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.delete(`/mcp/groups/${groupId}/servers/${serverName}`);
+    return response.data;
+  },
+
+  // Add multiple servers to a group
+  addServersToGroup: async (groupId: string, serverNames: string[]): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.post(`/mcp/groups/${groupId}/servers`, {
+      serverNames,
+    });
+    return response.data;
+  },
+
+  // Configure which tools from a server are exposed through the group
+  configureServerTools: async (groupId: string, serverName: string, tools: string[]): Promise<{ success: boolean; message: string; group: MCPServerGroup }> => {
+    const response = await javaGatewayApi.put(`/mcp/groups/${groupId}/servers/${serverName}/tools`, {
+      tools,
+    });
     return response.data;
   },
 };
