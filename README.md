@@ -782,50 +782,36 @@ See [server-java/TROUBLESHOOTING.md](server-java/TROUBLESHOOTING.md) for more so
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how to get started:
+We welcome contributions! Please read our **[Contributing Guide](CONTRIBUTING.md)** for details on:
 
-### Development Setup
+- 🐛 How to report bugs
+- 💡 Suggesting enhancements
+- 🔧 Development setup
+- 📝 Coding standards
+- ✅ Testing guidelines
+- 📋 Pull request process
+
+### Quick Start for Contributors
 
 ```bash
-# Fork and clone your fork
+# Fork and clone
 git clone https://github.com/YOUR_USERNAME/secure-mcp-gateway.git
 cd secure-mcp-gateway
 
-# Create feature branch
+# Create branch
 git checkout -b feature/amazing-feature
 
-# Start development environment
-docker-compose -f docker-compose.dev.yml up -d
+# Start services
+cd server-java && docker-compose up -d
 
-# Make your changes...
-
-# Run tests
-cd server-java && ./mvnw test
-cd ../policy-engine-go && go test ./...
-cd ../frontend && npm test
-
-# Commit with descriptive message
-git commit -m "Add amazing feature"
-
-# Push to your fork
+# Make changes, test, commit
+git commit -m "feat: add amazing feature"
 git push origin feature/amazing-feature
 
-# Open Pull Request on GitHub
+# Open Pull Request
 ```
 
-### Code Style
-
-- **Java**: Follow Spring Boot conventions, use Lombok
-- **Go**: Use `gofmt`, follow standard Go conventions
-- **TypeScript**: ESLint + Prettier (run `npm run lint`)
-- **Documentation**: Update relevant README files
-
-### Testing
-
-- **Unit tests**: Required for new features
-- **Integration tests**: For API endpoints
-- **Manual testing**: Test with real MCP servers
-- **Policy testing**: Verify policy enforcement works
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for complete guidelines.
 
 ## 📚 Documentation
 
@@ -877,9 +863,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support & Community
 
 - **Documentation**: [docs/](docs/)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Issues**: [GitHub Issues](https://github.com/datacline/secure-mcp-gateway/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/datacline/secure-mcp-gateway/discussions)
-- **Email**: support@datacline.com
 
 ## 🔑 Keywords
 
