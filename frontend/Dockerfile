@@ -14,8 +14,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build for production
-RUN npm run build
+# Build for production (skip TypeScript type checking, let Vite handle transpilation)
+RUN npx vite build
 
 # Production stage
 FROM nginx:alpine

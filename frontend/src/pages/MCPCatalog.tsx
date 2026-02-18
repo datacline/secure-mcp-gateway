@@ -340,8 +340,8 @@ export default function MCPCatalog() {
             )}
           </p>
         </div>
-        <button 
-          className="btn-refresh" 
+        <button
+          className="btn-refresh"
           onClick={() => performSearch(activeSearch, currentPage)}
           disabled={loading}
           title="Refresh"

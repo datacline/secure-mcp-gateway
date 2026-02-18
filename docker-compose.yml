@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../docker/init-policies-db.sql:/docker-entrypoint-initdb.d/02-init-policies.sql:ro
+      - ./docker/init-policies-db.sql:/docker-entrypoint-initdb.d/02-init-policies.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mcp_user -d mcp_gateway"]
       interval: 10s
@@ -41,7 +41,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ../docker/keycloak-realm.json:/opt/keycloak/data/import/realm.json:ro
+      - ./docker/keycloak-realm.json:/opt/keycloak/data/import/realm.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
   # STDIO Proxy Service (converts STDIO MCP servers to HTTP)
   stdio-proxy-service:
     build:
-      context: ../stdio-proxy-service
+      context: ./stdio-proxy-service
       dockerfile: Dockerfile
     container_name: stdio-proxy-service
     ports:
@@ -79,13 +79,13 @@ services:
   # Policy Engine (Go)
   policy-engine:
     build:
-      context: ../policy-engine-go
+      context: ./policy-engine-go
       dockerfile: Dockerfile
     container_name: policy-engine
     ports:
       - "9000:9000"
     volumes:
-      - ../policy-engine-go/policies:/app/policies
+      - ./policy-engine-go/policies:/app/policies
       - policy_logs:/app/logs
       - policy_data:/app/data
     environment:
@@ -107,7 +107,7 @@ services:
   # MCP Gateway (Java/Spring Boot)
   mcp-gateway-java:
     build:
-      context: .
+      context: ./server-java
       dockerfile: Dockerfile
     container_name: mcp-gateway-java
     environment:
@@ -155,8 +155,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./mcp_servers.yaml:/app/mcp_servers.yaml:ro
-      - ../policies:/app/policies:ro
+      - ./server-java/mcp_servers.yaml:/app/mcp_servers.yaml:ro
+      - ./policies:/app/policies:ro
       - gateway_logs:/app/logs
       - gateway_data:/app/data
     depends_on:
@@ -186,7 +186,7 @@ services:
       sh -c "pip install --no-cache-dir mcp sse-starlette starlette uvicorn &&
              python server.py"
     volumes:
-      - ../docker/mock_mcp_server.py:/app/server.py:ro
+      - ./docker/mock_mcp_server.py:/app/server.py:ro
     ports:
       - "3000:3000"
     healthcheck:
@@ -194,6 +194,28 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - mcp-network
+
+  # Frontend Web UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mcp-gateway-frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      mcp-gateway-java:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     networks:
       - mcp-network
 

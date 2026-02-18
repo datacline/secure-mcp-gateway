@@ -59,12 +59,12 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "cd server-java && docker-compose up -d",
-    "stop": "cd server-java && docker-compose down",
-    "restart": "cd server-java && docker-compose restart",
-    "logs": "cd server-java && docker-compose logs -f",
-    "clean": "cd server-java && docker-compose down -v",
-    "build": "cd server-java && docker-compose build",
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "logs": "docker-compose logs -f",
+    "clean": "docker-compose down -v",
+    "build": "docker-compose build",
     "test": "echo 'Run service-specific tests'",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:gateway": "cd server-java && ./mvnw spring-boot:run",

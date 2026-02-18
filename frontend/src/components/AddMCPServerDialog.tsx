@@ -166,7 +166,41 @@ export default function AddMCPServerDialog({ server, onClose, onSuccess }: AddMC
         }
       }
 
+      // Create the server
       await javaGatewayMcpApi.createServer(serverName, config);
+
+      // If it's a STDIO server, attempt to automatically convert it to HTTP
+      // Only if it has proper configuration and credentials
+      if (!isHttpServer && server.config?.command) {
+        // Check if all required environment variables are provided
+        const hasRequiredEnvVars = requiredEnvVars.length === 0 ||
+          requiredEnvVars.every(([key]) => envVars[key]?.trim());
+
+        // Check if authentication is configured when needed
+        const hasAuthIfNeeded = authMethod === 'none' || (authMethod !== 'none' && credential);
+
+        if (hasRequiredEnvVars && hasAuthIfNeeded) {
+          try {
+            // Show conversion progress
+            const originalError = error;
+            setError('Converting STDIO server to HTTP...');
+            await javaGatewayMcpApi.convertStdioToHttp(serverName);
+            setError(originalError); // Restore previous error state if any
+          } catch (convertErr: any) {
+            // Conversion failed - inform user but don't block
+            const errorMsg = convertErr.response?.data?.error || convertErr.message;
+            console.warn(`Auto-conversion failed: ${errorMsg}`);
+            setError(`Server created but conversion to HTTP failed. You can configure it manually from the server details page. Error: ${errorMsg}`);
+            // Give user time to read the message
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        } else {
+          // Missing prerequisites - inform user
+          setError('Server created. Complete the configuration on the server details page before the server can be used.');
+          await new Promise(resolve => setTimeout(resolve, 2500));
+        }
+      }
+
       onSuccess(serverName);
     } catch (err: any) {
       const message = err.response?.data?.error || err.message || 'Failed to add server';
@@ -255,9 +289,32 @@ export default function AddMCPServerDialog({ server, onClose, onSuccess }: AddMC
             </div>
           )}
 
+          {!isHttpServer && (
+            <div className="info-message" style={{
+              background: '#e3f2fd',
+              border: '1px solid #2196f3',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              display: 'flex',
+              gap: '8px',
+              color: '#1976d2'
+            }}>
+              <Terminal size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                <strong>STDIO to HTTP Conversion</strong>
+                <p style={{ margin: '4px 0 0 0' }}>
+                  This STDIO server will be automatically converted to HTTP after creation,
+                  making it accessible to MCP clients. Ensure all required credentials and
+                  environment variables are configured for successful conversion.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="form-section">
             <h3>Basic Configuration</h3>
-            
+
             <div className="form-group">
               <label htmlFor="serverName">Server Name *</label>
               <input
