@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Shield, Globe, Terminal, Plus, RefreshCw, ArrowRight, CheckCircle, XCircle, Search, Menu, ChevronRight, AlertCircle, Trash2, X } from 'lucide-react';
+import { Settings, Shield, Globe, Terminal, Plus, RefreshCw, CheckCircle, XCircle, Search, Menu, ChevronRight, AlertCircle, Trash2, X } from 'lucide-react';
 import { javaGatewayMcpApi, type MCPServer, type MCPServerGroup } from '../services/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -109,26 +109,6 @@ export default function MCPServers() {
     return 'var(--primary)';
   };
 
-  const handleConvertToHttp = async (server: MCPServer) => {
-    if (!confirm(`Convert "${server.name}" from STDIO to HTTP?\n\nThis will spawn an mcp-proxy process to wrap the STDIO server and expose it via HTTP.`)) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const result = await javaGatewayMcpApi.convertStdioToHttp(server.name);
-
-      // Reload servers to show the updated configuration
-      await loadServers();
-
-      alert(`Successfully converted "${server.name}" to HTTP!\n\nNew URL: ${result.url}\nProxy Port: ${result.proxy_port}`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to convert server';
-      alert(`Failed to convert "${server.name}" to HTTP:\n\n${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const stats = {
     total: servers.length,
@@ -166,11 +146,8 @@ export default function MCPServers() {
     
     // Check if any selected servers are STDIO
     if (hasStdioServers) {
-      alert(
-        `The following servers must be converted to HTTP before adding to a group:\n\n${stdioServers.join(', ')}\n\n` +
-        `Please use the "Convert to HTTP" button on each server's card first.`
-      );
-      return;
+      // STDIO servers will be automatically converted to HTTP when added to a group
+      // No need to block or warn the user
     }
     
     setShowActionsMenu(false);
@@ -199,11 +176,8 @@ export default function MCPServers() {
 
     // Check if any selected servers are STDIO
     if (hasStdioServers) {
-      alert(
-        `The following servers must be converted to HTTP before adding to a group:\n\n${stdioServers.join(', ')}\n\n` +
-        `Please use the "Convert to HTTP" button on each server's card first.`
-      );
-      return;
+      // STDIO servers will be automatically converted to HTTP when added to a group
+      // No need to block or warn the user
     }
 
     try {
@@ -600,17 +574,6 @@ export default function MCPServers() {
                     Policies {policyCount > 0 && `(${policyCount})`}
                   </Button>
 
-                  {isStdio && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleConvertToHttp(server)}
-                      icon={<ArrowRight size={14} />}
-                      title="Convert STDIO server to HTTP endpoint"
-                    >
-                      Convert to HTTP
-                    </Button>
-                  )}
                 </div>
               </Card>
             );

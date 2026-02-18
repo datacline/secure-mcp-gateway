@@ -111,7 +111,6 @@ git remote add upstream https://github.com/datacline/secure-mcp-gateway.git
 #### Start All Services
 
 ```bash
-cd server-java
 docker-compose up -d
 ```
 
@@ -424,11 +423,10 @@ go test ./...
 
 ```bash
 # Start services
-cd server-java
 docker-compose up -d
 
 # Run integration tests
-./test-config-endpoints.sh
+./server-java/test-config-endpoints.sh
 ```
 
 ## Documentation

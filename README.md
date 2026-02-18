@@ -110,21 +110,75 @@ AI Agent → Gateway (Auth + Policy + Audit) → Controlled MCP Access ✅
 git clone https://github.com/datacline/secure-mcp-gateway.git
 cd secure-mcp-gateway
 
+# (Optional) Set API keys for MCP catalog visibility
+# Required only if you want to see public MCP servers in the catalog
+export POSTMAN_API_KEY="your_postman_api_key_here"
+
 # Start all services (Gateway, Keycloak, PostgreSQL, Policy Engine, Frontend)
 docker-compose up -d
 
-# Wait 30 seconds for services to initialize, then test
+# Wait 30 seconds for services to initialize
+# Check that the gateway is ready
 curl http://localhost:8000/actuator/health
+
+# Open the Web UI in your browser
+open http://localhost:5173
+# Or manually navigate to: http://localhost:5173
 ```
+
+**Note:**
+- The Postman API key is **optional** and only needed if you want to browse the public MCP server catalog in the UI
+- Get your Postman API key from: https://www.postman.com/settings/me/api-keys
+- Without the key, you can still manually configure and use MCP servers
 
 ### Access Services
 
-| Service | URL | Credentials |
+Once all services are running, access them at:
+
+| Service | URL | Description |
 |---------|-----|-------------|
-| **Gateway API** | http://localhost:8000 | JWT token required |
-| **Web UI** | http://localhost:5173 | testuser / testpass |
-| **Keycloak Admin** | http://localhost:8080 | admin / admin |
-| **Policy Engine** | http://localhost:9000 | Internal service |
+| **Web UI** | **http://localhost:5173** | **👈 Start here! Main management interface (No login required)** |
+| **Gateway API** | http://localhost:8000 | REST API for MCP operations |
+| **Keycloak Admin** | http://localhost:8080 | User and authentication management (admin / admin) |
+| **Policy Engine** | http://localhost:9000 | Policy evaluation service (Internal) |
+
+**Getting Started:**
+1. Open **http://localhost:5173** in your browser
+2. You'll see the dashboard with MCP servers, groups, and policies
+3. No login required - the UI is ready to use!
+
+### What to Do After Starting Services
+
+After running `docker-compose up -d`, follow these steps:
+
+**Option 1: Use the Web UI (Recommended for beginners)**
+```bash
+# Open the Web UI
+open http://localhost:5173
+
+# No login required! From the UI you can:
+# - View and configure MCP servers
+# - Create MCP groups
+# - Manage policies
+# - Test tool access
+```
+
+**Option 2: Integrate with Claude Desktop**
+See [Test with Claude Desktop](#test-with-claude-desktop) section below
+
+**Option 3: Use the API directly**
+```bash
+# Get an authentication token first
+TOKEN=$(curl -X POST http://localhost:8080/realms/mcp-gateway/protocol/openid-connect/token \
+  -d "client_id=mcp-gateway-client" \
+  -d "username=testuser" \
+  -d "password=testpass" \
+  -d "grant_type=password" | jq -r '.access_token')
+
+# List MCP servers
+curl http://localhost:8000/mcp/servers \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ### Test with Claude Desktop
 
@@ -291,15 +345,28 @@ cd secure-mcp-gateway
 cp .env.example .env
 nano .env  # Edit as needed
 
-# Start all services
+# Start all services with one command
 docker-compose up -d
 
-# Check status
+# Wait 30 seconds for initialization, then open the UI
+open http://localhost:5173
+
+# Or check service status
 docker-compose ps
 
-# View logs
+# View logs if needed
 docker-compose logs -f mcp-gateway-java
+docker-compose logs -f policy-engine
 ```
+
+**This single command starts all services:**
+- 🎨 Frontend Web UI (port 5173)
+- 🚀 Java MCP Gateway (port 8000)
+- 📋 Policy Engine (port 9000)
+- 🔄 STDIO Proxy Service (port 8081)
+- 🗄️ PostgreSQL Database (port 5432)
+- 🔐 Keycloak Authentication (port 8080)
+- 🧪 Mock MCP Server (port 3000)
 
 ### Method 2: Individual Services
 
@@ -729,7 +796,9 @@ docker-compose up -d postgres
 docker-compose restart mcp-gateway-java
 
 # 3. Policy engine not reachable
-# Ensure POLICY_ENGINE_URL=http://host.docker.internal:9000
+docker-compose up -d policy-engine
+docker-compose restart mcp-gateway-java
+# Note: Policy Engine URL is now http://policy-engine:9000 (internal service name)
 ```
 
 ### Policy Filtering Not Working
@@ -802,7 +871,7 @@ cd secure-mcp-gateway
 git checkout -b feature/amazing-feature
 
 # Start services
-cd server-java && docker-compose up -d
+docker-compose up -d
 
 # Make changes, test, commit
 git commit -m "feat: add amazing feature"
