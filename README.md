@@ -7,7 +7,9 @@
 [![Go](https://img.shields.io/badge/Go-1.21-blue.svg)](https://golang.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 
-> **Production-ready security gateway for Model Context Protocol (MCP) servers** with authentication, policy-based access control, tool filtering, and comprehensive audit logging for AI agents, Claude Desktop, VS Code, and custom LLM applications.
+> **Self-hosting ready security gateway for Model Context Protocol (MCP) servers** with authentication, policy-based access control, tool filtering, and comprehensive audit logging for AI agents, Claude Desktop, VS Code, and custom LLM applications.
+
+<img width="1536" height="1024" alt="datacline-mcp-gateway" src="https://github.com/user-attachments/assets/811a36db-e516-4e62-a87b-8778d9af881e" />
 
 ## 🌟 What is Secure MCP Gateway?
 
