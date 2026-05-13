@@ -63,7 +63,46 @@ jobs:
           echo "✓ Tag version matches package.json"
 
       - name: Verify package contents
-        run: npm pack --dry-run --workspace @datacline/smcp
+        run: |
+          PACK_JSON=$(npm pack --dry-run --json --workspace @datacline/smcp)
+          node -e '
+            const pack = JSON.parse(process.argv[1]);
+            const files = new Set((pack[0]?.files ?? []).map((file) => file.path));
+
+            const requiredFiles = [
+              "dist/smcp.cjs",
+              "dist/smcp.mjs",
+            ];
+
+            const forbiddenPatterns = [
+              /^src\//,
+              /^test\//,
+              /^tests\//,
+              /^scripts\//,
+              /^\.github\//,
+              /(^|\/)tsconfig(\.[^/]+)?\.json$/,
+              /(^|\/)(vite|vitest|jest|eslint|prettier|rollup)\.config\.[^/]+$/,
+            ];
+
+            const missing = requiredFiles.filter((file) => !files.has(file));
+            const forbidden = [...files].filter((file) =>
+              forbiddenPatterns.some((pattern) => pattern.test(file))
+            );
+
+            if (missing.length > 0 || forbidden.length > 0) {
+              if (missing.length > 0) {
+                console.error("Missing required package files:");
+                for (const file of missing) console.error("  - " + file);
+              }
+              if (forbidden.length > 0) {
+                console.error("Forbidden files included in package:");
+                for (const file of forbidden) console.error("  - " + file);
+              }
+              process.exit(1);
+            }
+
+            console.log("✓ Package contents verified");
+          ' "$PACK_JSON"
 
       - name: Determine npm dist-tag from version
         id: dist_tag
