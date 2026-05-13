@@ -44,7 +44,8 @@ jobs:
         id: release_tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
+            RAW_TAG="${{ github.event.inputs.tag }}"
+            TAG="$(printf '%s' "$RAW_TAG" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s#^refs/tags/##')"
           else
             TAG="${GITHUB_REF#refs/tags/}"
           fi
