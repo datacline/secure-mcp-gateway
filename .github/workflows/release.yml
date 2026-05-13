@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Git tag to publish (for example: v0.1.0)
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -25,8 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -36,25 +28,16 @@ jobs:
 
       - run: npm ci --workspace @datacline/smcp --include-workspace-root
 
+      - run: npm run lint --workspace @datacline/smcp
+
       - run: npm run build --workspace @datacline/smcp
 
       - run: npm test --workspace @datacline/smcp
 
-      - name: Resolve release tag
-        id: release_tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RAW_TAG="${{ github.event.inputs.tag }}"
-            TAG="$(printf '%s' "$RAW_TAG" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s#^refs/tags/##')"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Resolved release tag: $TAG"
-
       - name: Verify tag matches package.json version
         run: |
-          TAG="${{ steps.release_tag.outputs.tag }}"
+          TAG="${{ github.ref }}"
+          TAG="${TAG#refs/tags/}"
           VERSION=$(node -e "console.log(require('./packages/smcp/package.json').version)")
           if [ "$TAG" != "v$VERSION" ]; then
             echo "Error: tag '$TAG' does not match package.json version 'v$VERSION'"
@@ -64,45 +47,24 @@ jobs:
 
       - name: Verify package contents
         run: |
-          PACK_JSON=$(npm pack --dry-run --json --workspace @datacline/smcp)
-          node -e '
-            const pack = JSON.parse(process.argv[1]);
-            const files = new Set((pack[0]?.files ?? []).map((file) => file.path));
-
-            const requiredFiles = [
-              "dist/smcp.cjs",
-              "dist/smcp.mjs",
-            ];
-
-            const forbiddenPatterns = [
-              /^src\//,
-              /^test\//,
-              /^tests\//,
-              /^scripts\//,
-              /^\.github\//,
-              /(^|\/)tsconfig(\.[^/]+)?\.json$/,
-              /(^|\/)(vite|vitest|jest|eslint|prettier|rollup)\.config\.[^/]+$/,
-            ];
-
-            const missing = requiredFiles.filter((file) => !files.has(file));
-            const forbidden = [...files].filter((file) =>
-              forbiddenPatterns.some((pattern) => pattern.test(file))
-            );
-
-            if (missing.length > 0 || forbidden.length > 0) {
-              if (missing.length > 0) {
-                console.error("Missing required package files:");
-                for (const file of missing) console.error("  - " + file);
-              }
-              if (forbidden.length > 0) {
-                console.error("Forbidden files included in package:");
-                for (const file of forbidden) console.error("  - " + file);
-              }
+          npm pack --dry-run --json --workspace @datacline/smcp > pack.json
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('pack.json'));
+            const files = p[0].files.map(f => f.path).sort();
+            const required = ['dist/smcp.cjs', 'dist/smcp.mjs', 'README.md', 'CHANGELOG.md', 'LICENSE', 'package.json'];
+            const missing = required.filter(r => !files.includes(r));
+            if (missing.length) {
+              console.error('Missing required files in tarball:', missing);
+              console.error('Got:', files);
               process.exit(1);
             }
-
-            console.log("✓ Package contents verified");
-          ' "$PACK_JSON"
+            const forbidden = files.filter(f => f.startsWith('bin/') || f.startsWith('src/') || f.startsWith('test/') || f === 'tsconfig.json' || f === 'tsup.config.ts');
+            if (forbidden.length) {
+              console.error('Tarball contains files that should not be published:', forbidden);
+              process.exit(1);
+            }
+            console.log('Tarball OK. Files:', files);
+          "
 
       - name: Determine npm dist-tag from version
         id: dist_tag
@@ -124,13 +86,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release if missing
-        run: |
-          TAG="${{ steps.release_tag.outputs.tag }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "GitHub release already exists for $TAG"
-          else
-            gh release create "$TAG" --generate-notes
-          fi
+      - name: Create GitHub Release
+        run: gh release create "${{ github.ref }}" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
