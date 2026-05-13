@@ -20,14 +20,23 @@
   "license": "MIT",
   "author": "Datacline",
   "type": "module",
-  "main": "./smcp.js",
+  "main": "./dist/smcp.cjs",
+  "module": "./dist/smcp.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/smcp.mjs",
+      "require": "./dist/smcp.cjs"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
-    "smcp": "bin/smcp.js"
+    "smcp": "dist/smcp.cjs"
   },
   "files": [
-    "bin",
-    "smcp.js",
-    "README.md"
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -35,9 +44,16 @@
   "preferGlobal": true,
   "scripts": {
     "smcp": "node ./bin/smcp.js",
-    "start": "node ./smcp.js",
+    "start": "node ./bin/smcp.js",
+    "build": "tsup",
+    "lint": "tsc --noEmit",
     "test": "node ./bin/smcp.js --help",
     "commands": "node ./bin/smcp.js commands"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsup": "^8",
+    "typescript": "^5"
   },
   "publishConfig": {
     "access": "public"

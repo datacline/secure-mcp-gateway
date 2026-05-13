@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18.17', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci --workspace @datacline/smcp --include-workspace-root
+
+      - run: npm run lint --workspace @datacline/smcp
+
+      - run: npm run build --workspace @datacline/smcp
+
+      - run: npm test --workspace @datacline/smcp
+
+  pack-check:
+    name: verify package contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci --workspace @datacline/smcp --include-workspace-root
+
+      - run: npm run build --workspace @datacline/smcp
+
+      - name: Inspect tarball
+        run: |
+          npm pack --dry-run --json --workspace @datacline/smcp > pack.json
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('pack.json'));
+            const files = p[0].files.map(f => f.path).sort();
+            const required = ['dist/smcp.cjs', 'dist/smcp.mjs', 'README.md', 'CHANGELOG.md', 'LICENSE', 'package.json'];
+            const missing = required.filter(r => !files.includes(r));
+            if (missing.length) {
+              console.error('Missing required files in tarball:', missing);
+              console.error('Got:', files);
+              process.exit(1);
+            }
+            const forbidden = files.filter(f => f.startsWith('bin/') || f.startsWith('src/') || f.startsWith('test/') || f === 'tsconfig.json' || f === 'tsup.config.ts');
+            if (forbidden.length) {
+              console.error('Tarball contains files that should not be published:', forbidden);
+              process.exit(1);
+            }
+            console.log('Tarball OK. Files:', files);
+          "
