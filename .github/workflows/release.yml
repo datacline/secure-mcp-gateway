@@ -36,6 +36,8 @@ jobs:
 
       - run: npm ci --workspace @datacline/smcp --include-workspace-root
 
+      - run: npm run build --workspace @datacline/smcp
+
       - run: npm test --workspace @datacline/smcp
 
       - name: Resolve release tag
